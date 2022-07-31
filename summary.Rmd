@@ -1,0 +1,847 @@
+---
+title: "FD_trial"
+author: "Kushagra Gupta"
+date: "5/23/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+data_control = HTE_data %>% filter(treated == '0')
+  
+fmla <- paste('tactics_2_delta', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+We find that only trust in Fauci, and the self identified ability to spot misinformation is statistically significant in explaning pre-test score. In addition to these covariates, we also include ideology as a covariate given its importance in explanaing ability to identify misinformation in the literature.
+
+
+```{r}
+cov_to_check = c('Ideology_numeric', 'FauciTrust_numeric', 'KnowSpot_numeric')
+cov_to_check = c( 'FauciTrust_numeric', 'KnowSpot_numeric')
+cov_to_check = c( 'ReportUserSocialMedia_numeric')
+```
+
+```{r}
+model = lm(tactics_2_delta ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2_accuracy ~ ReportUserSocialMedia_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+# Summary table
+
+```{r}
+mean_Delta_1_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+mean_Delta_1_False_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1_False),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+MisGraph1_Delta_2_accuracy_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_accuracy),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+Anecdotes1_Delta_2_accuracy_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_accuracy),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+FalseComp1_Delta_2_accuracy_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_accuracy),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+True1_Delta_2_accuracy_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(True1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(True1_Delta_2_accuracy),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+MisGraph1_Delta_2_precision_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_precision),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+Anecdotes1_Delta_2_precision_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_precision),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+FalseComp1_Delta_2_precision_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_precision),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+MisGraph1_Delta_2_recall_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_recall),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+Anecdotes1_Delta_2_recall_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_recall),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+
+FalseComp1_Delta_2_recall_result = t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_recall),
+  conf.level = conf_level
+) %>%
+  broom::tidy() %>%
+  # mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+```{r}
+
+fmla <- paste('mean_Delta_1_False', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('mean_Delta_1_False ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('mean_Delta_1_False ~ FauciTrust_numeric + KnowSpot_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_1_False ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_1_False ~ as.factor(neg_misgraph1) + FauciTrust_numeric + KnowSpot_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('mean_Delta_1_True', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('mean_Delta_1_True ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('mean_Delta_1_True ~ Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_1_True ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_1_True ~ as.factor(neg_misgraph1) + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('mean_Delta_3a_False', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('mean_Delta_3a_False ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('mean_Delta_3a_False ~ FauciTrust_numeric + PostFrequency_numeric + BlockUserSocialMedia_numeric + SeenManipulative_numeric + KnowSpot_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_3a_False ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_3a_False ~ as.factor(neg_misgraph1) + FauciTrust_numeric + PostFrequency_numeric + BlockUserSocialMedia_numeric + SeenManipulative_numeric + KnowSpot_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('mean_Delta_3b_False', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('mean_Delta_3b_False ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('mean_Delta_3b_False ~ GeneralTrust_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_3b_False ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('mean_Delta_3b_False ~ as.factor(neg_misgraph1) + GeneralTrust_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('MisGraph1_Delta_2_accuracy', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2_accuracy ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('MisGraph1_Delta_2_accuracy ~ Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2_accuracy ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2_accuracy ~ as.factor(neg_misgraph1) + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('Anecdotes1_Delta_2_accuracy', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2_accuracy ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('Anecdotes1_Delta_2_accuracy ~ Gender_numeric + White + Income_numeric + Ideology_numeric + SciTrust_numeric + PostFrequency_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2_accuracy ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2_accuracy ~ as.factor(neg_misgraph1) + Gender_numeric + White + Income_numeric + Ideology_numeric + SciTrust_numeric + PostFrequency_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('FalseComp1_Delta_2_accuracy', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('FalseComp1_Delta_2_accuracy ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('FalseComp1_Delta_2_accuracy ~ Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('FalseComp1_Delta_2_accuracy ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('FalseComp1_Delta_2_accuracy ~ as.factor(neg_misgraph1) + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('tactics_Delta_2', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('tactics_Delta_2 ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('tactics_Delta_2 ~ education_level_2 + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('tactics_Delta_2 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('tactics_Delta_2 ~ as.factor(neg_misgraph1) + education_level_2 + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('True1_Delta_2', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('True1_Delta_2 ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('True1_Delta_2 ~ Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_2 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_2 ~ as.factor(neg_misgraph1) + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('MisGraph1_Delta_2', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2 ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('MisGraph1_Delta_2 ~ education_level_2 + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('MisGraph1_Delta_2 ~ as.factor(neg_misgraph1) + education_level_2 + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('Anecdotes1_Delta_2', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2 ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('Anecdotes1_Delta_2 ~ Gender_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2 ~ as.factor(neg_misgraph1) + Gender_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+
+fmla <- paste('FalseComp1_Delta_2', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+```{r}
+fmla = paste('FalseComp1_Delta_2 ~  treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+#MisGraph1_Delta_2
+fmla = paste('FalseComp1_Delta_2 ~ Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('FalseComp1_Delta_2 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2 ~ as.factor(neg_misgraph1) + Ideology_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"), level = conf_level)
+results
+```
+
+```{r}
+means_accuracy_ %>%
+  ggplot(aes(treatment, mean, group = covariate, color = treatment)) +
+  geom_errorbar(aes(ymin = mean - 1.96*se, ymax = mean + 1.96*se, 
+                    linetype = as.factor(covariate)),
+              width = .1,
+              position=position_dodge(width = .4)) + 
+  geom_point(size =3,
+             position=position_dodge2(width= .4))  +
+  scale_y_continuous(breaks = seq(0, 6 , 1), 
+                     labels = seq(0, 6, 1), 
+                     limits = c(0, 6)) + 
+  scale_x_discrete(labels = function(x)str_replace(str_replace_all(x, "\\_", " "), " ", "\\\n")) + 
+  labs(title = "Means and 95% CI by Arm \n and covariate Level", 
+       x = 'Treatment', 
+       y = "Accuracy Score", 
+       caption  = "For participants who passed the attention check (N = 291); 95% CI displayed. \n Dotted CIs represent estimates for covariate.") +
+  theme_minimal() + 
+  theme(strip.text = element_text(size = 12), 
+        axis.text = element_text(size = 7), 
+        axis.title = element_text(size = 12, face = "bold"), 
+        legend.position = "none", 
+        plot.title = element_text(size = 16, face = "bold", hjust = 0.5))
+```
+
+
+```{r}
+fmla <- paste('Anecdotes1_Delta_1', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('Anecdotes1_Delta_1 ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_1 ~ SciTrust_numeric + BlockUserSocialMedia_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_1 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('Anecdotes1_Delta_1 ~ SciTrust_numeric + BlockUserSocialMedia_numeric + as.factor(neg_misgraph1)  + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla <- paste('Combined1_Delta_1', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('Combined1_Delta_1 ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('Combined1_Delta_1 ~ FauciTrust_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('Combined1_Delta_1 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('Combined1_Delta_1 ~ FauciTrust_numeric + as.factor(neg_misgraph1)  + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla <- paste('FalseComp1_Delta_1', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('FalseComp1_Delta_1 ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('FalseComp1_Delta_1 ~  as.factor(neg_misgraph1)  + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla <- paste('MisGraph1_Delta_1', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('MisGraph1_Delta_1 ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+
+```{r}
+fmla = paste('Combined1_Delta_1 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla <- paste('True1_Delta_1', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('True1_Delta_1 ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+
+```{r}
+fmla = paste('True1_Delta_1 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla <- paste('True2_Delta_1', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('True1_Delta_1 ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_1 ~ education_level_2 + Ideology_numeric + GeneralTrust_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_1 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_1 ~ education_level_2 + Ideology_numeric + GeneralTrust_numeric + as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla <- paste('Anecdotes1_Delta_2_accuracy', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+fmla = paste('Anecdotes1_Delta_2_accuracy ~ treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_1 ~ education_level_2 + Ideology_numeric + GeneralTrust_numeric + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_1 ~ as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+fmla = paste('True1_Delta_1 ~ education_level_2 + Ideology_numeric + GeneralTrust_numeric + as.factor(neg_misgraph1) + treated')
+model = lm(fmla, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```

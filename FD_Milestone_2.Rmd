@@ -1,0 +1,4203 @@
+---
+title: "[First Draft] Milestone 2 Analysis"
+author: "Reka Zempleni, Ben Ditchfield, Quentin Hsu, Ross Dahlke, Kushagra Gupta"
+date: "May 2022"
+output: 
+  html_document:
+    highlight: haddock
+    theme: journal
+    number_sections: no
+    toc: yes
+    toc_depth: 5
+    toc_float: yes
+    code_folding: hide
+---
+
+<style>
+div.blue { background-color:#e6f0ff; border-radius: 5px; padding: 20px;}
+</style>
+
+<style>
+div.medblue { background-color: #b3d1ff; border-radius: 5px; padding: 5px;}
+</style>
+
+<style>
+div.darkblue { background-color: #9ac2ff; border-radius: 5px; padding: 5px;}
+</style>
+
+
+
+```{r setup, include = FALSE}
+set.seed(103851)
+knitr::opts_chunk$set(
+  eval = TRUE,
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+
+---
+
+# Introduction
+
+We conducted an experiment to test whether a 6-minutes course can effectively teach participants to recognize manipulative tactics in social media posts. Our experiment consisted of a demographics survey, a pre- and post tests, and the tactics course (or sleep course for the control group). Details of our experiment can be seen in our pre-analysis plan.
+
+
+## Research Questions
+
+Our experiment focuses on four research questions:
+
+
+
+1. Can a 6-minute course focused on manipulative tactics, in the vein of First Draft’s existing SMS courses, help users better identify manipulative content?
+2. Does the course reduce the sharing of manipulative content online and offline?
+3. Does the course make participants better at identifying each individual tactic covered in the course?
+4. Are there heterogeneous treatment effects (HTE) where our course works better for certain subgroups than others? In particular, are there any differences based on users’ misinformation susceptibility at baseline (as measured during the pre-test), political ideology, and income level?
+
+
+## Hypotheses
+
+These research questions are supplemented with a list of 10 hypotheses.
+
+
+
+1. H1: Participants will be more capable of rating misinformation correctly as manipulative after taking the course.
+    1. SH1: Participants will not identify true content as more manipulative after taking the course.
+2. H2: Participants will be more capable of identifying misleading graphs after taking the course.
+3. H3: Participants will be more capable of identifying anecdotes after taking the course.
+4. H4: Participants will be more capable of identifying false comparisons after taking the course.
+5. H5: Participants will be less likely to share misinformation online after taking the course.
+6. H6: Participants will be less likely to share misinformation offline after taking the course.
+7. H7: Participants with different levels of susceptibility to misinformation at baseline will react differently to the treatment in terms of their overall ability to identify manipulative content.
+8. H8: Participants with different political ideologies will react differently to the treatment in terms of their overall ability to identify manipulative content.
+9. H9: Participants with different levels of income will react differently to the treatment in terms of their overall ability to identify manipulative content.
+
+
+# Summary of Insights
+
+1. Our 6-minutes tactics focused course helped participants label manipulative posts as 12 percentage points more manipulative.
+2. At the same time, we see increased skepticism for posts in general. Participants also labeled non-manipulative posts as 15.4 percentage points more manipulative. In particular, participants were more skeptical of non-manipulative graphs.
+3. We see drops in accuracy of identifying the 3 tactics we taught in the treatment. This drop is due to an increase (not stat sig) in false positive identification of these tactics, suggesting the users are not precise in their recognition of these tactics. There is a stat sig increase in identification of these tactics when the tactics are present for misleading graphs and anecdotes and a non-stat sig increase for false comparisons.
+4. Our tactics course did not seem to change online and offline sharing behavior. We did not explicitly teach about sharing behaviors, so this lack of change is not surprising. We did hope that improved identification of misinformation could lead to reduced sharing behavior. (Note: it is possible that motivation for sharing changed, however, we focus on overall sharing behavior regardless of motivation because all sharing contributes to increasing the reach and popularity of misinformation on social media.)
+5. We did not find any HTE effects.
+6. We performed additional covariate balancing and variance reduction techniques. These helped improve the significance of our estimates slightly, but not enough to change any of our initial conclusions.
+
+# Data Processing
+
+We will first process the data so that we have all the necessary variables to investigate our hypotheses. We also fix up some column naming typos and values to make them more tractable for analysis.
+
+## Load required packages
+
+```{r load_packages, include=FALSE}
+library(tidyverse)
+library(randomizr)
+library(estimatr)
+library(kableExtra)
+library(ggthemes)
+library(reshape2)
+library(bindata)
+library(lmtest)
+library(sandwich)
+library(grid)
+library(gridExtra)
+```
+
+## Import Data
+
+```{r import_data}
+df <- read.csv('Data/FirstDraft_Data.csv', stringsAsFactors=F)
+# Drop first 2 rows as they are additional json headers
+df <- df[-(1:2),]
+# Add index column based on row number
+df <- rownames_to_column(df, "idx")
+
+# Fix a few column name typos
+df <- df %>% rename(
+  'Gender' = 'Gender.',
+  'Race' = 'Race.',
+  'Education' = 'Education.',
+  'ReportUserSocialMedia' = 'ReportUserSocialMedi',
+  'misgraph1' = 'misgraph',
+  'falsecomp1' = 'falsecomp',
+  'anecdotes1' = 'anecdotes',
+  'combined1' = 'combined'
+)
+```
+
+## Generate Easy Access Column Names
+This section stores column names from the dataset for later analysis.
+
+```{r}
+# Test Questions (original ones, these will get rewritten in next step)
+test_colnames_orig <- c('True1a', 'True1a2', 'True1a3a', 'True1a3b', 'True1b', 'True1b2', 'True1b3a', 'True1b3b', 'True2a', 'True2a2', 'True2a3a', 'True2a3b', 'True2b', 'True2b2', 'True2b3a', 'True2b3b', 'MisGraph1a', 'MisGraph1a2', 'MisGraph1a3a', 'MisGraph1a3b', 'MisGraph1b', 'MisGraph1b2', 'MisGraph1b3a', 'MisGraph1b3b', 'FalseComp1a', 'FalseComp1a2', 'FalseComp1a3a', 'FalseComp1a3b', 'FalseComp1b', 'FalseComp1b2', 'FalseComp1b3a', 'FalseComp1b3b', 'Anecdotes1a', 'Anecdotes1a2', 'Anecdotes1a3a', 'Anecdotes1a3b', 'Anecdotes1b', 'Anecdotes1b2', 'Anecdotes1b3a', 'Anecdotes1b3b', 'Combined1a', 'Combined1a2', 'Combined1a3a', 'Combined1a3b', 'Combined1b', 'Combined1b2', 'Combined1b3a', 'Combined1b3b')
+
+# Rename first test questions with prefix 1
+df <-
+  df %>% rename_with(
+    .fn = ~ paste0(.x, "1"),
+    .cols = grep('^[A-Za-z]*\\d[A-Za-z]$', test_colnames_orig, value = T)
+  )
+
+# Use these test column names going forward
+test_colnames <- unlist(lapply(test_colnames_orig,
+                               function(x) {
+                                 ifelse(str_detect(x, "^[A-Za-z]*\\d[A-Za-z]$"), paste0(x, '1'), x)
+                               }))
+```
+
+
+```{r}
+# Demographics
+demographic_colnames <- c('Gender', 'Race', 'Education', 'Income', 'Ideology', 'GeneralTrust', 'KnowFauci', 'TrustFauci', 'TrustScientists', 'NewsSources', 'PostFrequency', 'BlockUserSocialMedia', 'ReportUserSocialMedia', 'SeenManipulative', 'KnowSpot')
+
+qualtrics_demographic_colnames <- c('age', 'gender', 'hhi', 'ethnicity', 'hispanic', 'education', 'political_party', 'region')
+
+# Course
+control_course_colnames <- c('SleepSchedulQ1', 'SleepSchedulQ2', 'SleepSchedulQ3', 'SleepCaffineQ1', 'SleepCaffineQ2', 'SleepCaffineQ3', 'SleepHoursQ1', 'SleepHoursQ2', 'SleepHoursQ3')
+
+# Treatment
+treat_course_colnames <- c('TreatGraphsQ1', 'TreatGraphsQ2', 'TreatGraphsQ3', 'TreatAnecdotesQ1', 'TreatAnecdotesQ2', 'TreatAnecdotesQ3', 'TreatFalseCompsQ1', 'TreatFalseCompsQ2', 'TreatFalseCompsQ3')
+```
+
+
+## Clean Test Answer Choices
+
+The answer choices currently have the word labels for 1 and 6. We remove the words and then cast the column to integer.
+
+```{r}
+# Clean all numeric test question answers
+num_test_cols <- grep('2$', test_colnames, value = T, invert = T)
+df[num_test_cols] <-
+  sapply(df[num_test_cols], function(x) {
+    as.integer(substr(x, 1, 1))
+  })
+```
+
+```{r}
+# Flip True Values since higher score for selecting not manipulative
+df[grep('^True', num_test_cols, value = T)] <-
+  sapply(df[grep('^True', num_test_cols, value = T)], function(x) {
+    as.integer(7 - x)
+  })
+```
+
+
+## Generate Pre-Post Columns
+
+We tracked which question (a or b) was shown to each user during their pre and post tests since this allocation was randomized For analysis, we want a column of all the Pre-Test questions and another for all the Post-Test questions. We look up the right columns for each question for each user and create Pre and Post Test columns.
+
+```{r}
+# function to add pre and post columns
+prepost_lookup <-
+  function(df,
+           lookup_col,
+           qnum = '',
+           timer = FALSE) {
+    lower_lookup_col <- tolower(lookup_col)
+    neg_lower_lookup_col <- paste0('neg_', lower_lookup_col)
+    df[neg_lower_lookup_col] = ifelse(df[[lower_lookup_col]] == 'a', 'b', 'a')
+    
+    if (timer == FALSE) {
+      df[paste0(lookup_col, '_Pre_', qnum)] <-
+        df[cbind(seq_len(nrow(df)),
+                 match(paste0(lookup_col, df[[lower_lookup_col]], qnum), colnames(df)))]
+      
+      df[paste0(lookup_col, '_Post_', qnum)] <-
+        df[cbind(seq_len(nrow(df)),
+                 match(paste0(lookup_col, df[[neg_lower_lookup_col]], qnum), colnames(df)))]
+      
+    } else {
+      df[paste0(lookup_col, '_Pre_', 'Timer')] <-
+        df[cbind(seq_len(nrow(df)),
+                 match(
+                   paste0('Timer_', lower_lookup_col, df[[lower_lookup_col]], '_Page.Submit'),
+                   colnames(df)
+                 ))]
+      
+      df[paste0(lookup_col, '_Post_', 'Timer')] <-
+        df[cbind(seq_len(nrow(df)),
+                 match(
+                   paste0('Timer_', lower_lookup_col, df[[neg_lower_lookup_col]], '_Page.Submit'),
+                   colnames(df)
+                 ))]
+      
+    }
+    
+    return(df)
+  }
+```
+
+```{r}
+# Create pre and post columns
+for (testq in c('True1',
+                'True2',
+                'MisGraph1',
+                'FalseComp1',
+                'Anecdotes1',
+                'Combined1')) {
+  # cycle through 4 questions
+  for (qnum in c('1', '2', '3a', '3b')) {
+    df <- prepost_lookup(df, testq, qnum)
+  }
+}
+
+# Create pre and post columns for question times
+for (testq in c('True1',
+                'True2',
+                'MisGraph1',
+                'FalseComp1',
+                'Anecdotes1',
+                'Combined1')) {
+  df <- prepost_lookup(df, testq, '', timer = TRUE)
+}
+
+# Convert numeric columns to numeric type
+df[, grep('.*_(?:Pre|Post)_.*[^2]$', colnames(df))] <-
+  df[, grep('.*_(?:Pre|Post)_.*[^2]$', colnames(df))] %>% mutate_if(is.character, as.numeric)
+```
+
+We also calculate the delta between post and pre test.
+
+```{r}
+# Delta Post - Pre per question
+df[str_replace(grep('.*_Post_.*[^2]$', colnames(df), value = T), 'Post', 'Delta')] <-
+  df[, grep('.*_Post_.*[^2]$', colnames(df))] - df[, grep('.*_Pre_.*[^2]$', colnames(df))]
+```
+
+Below is sample code to pull the new columns.
+
+```{r, results='hide'}
+# Pull Pre Test columns
+pre_test_colnames <- grep('.*_Pre_.*', colnames(df))
+df[, pre_test_colnames] %>% head()
+
+# Pull Post Test columns
+post_test_colnames <- grep('.*_Post_.*', colnames(df))
+df[, post_test_colnames] %>% head()
+
+# Pull Delta columns
+delta_test_colnames <- grep('.*_Delta_.*', colnames(df))
+df[, delta_test_colnames] %>% head()
+```
+
+
+## Tactics Columns, Deltas, Means
+
+We also need to process the multi-select tactics identification question. We look at every selection box and evaluate if it is correct or not. The user receives a final score based on the proportion of correct answer choices selected. We calculate various metrics (explained later) for the individual tactics and the overall results.
+
+```{r}
+df <- df %>%
+  mutate(
+    True1_Pre_2_binary = if_else(True1_Pre_2 == "Post is not manipulative", 1, 0),
+    True1_Post_2_binary = if_else(True1_Post_2 == "Post is not manipulative", 1, 0),
+    True2_Pre_2_binary = if_else(True2_Pre_2 == "Post is not manipulative", 1, 0),
+    True2_Post_2_binary = if_else(True2_Post_2 == "Post is not manipulative", 1, 0),
+    MisGraph1_Pre_2_binary = if_else(MisGraph1_Pre_2 == "Manipulative graph", 1, 0),
+    MisGraph1_Post_2_binary = if_else(MisGraph1_Post_2 == "Manipulative graph", 1, 0),
+    FalseComp1_Pre_2_binary = if_else(FalseComp1_Pre_2 == "False comparison", 1, 0),
+    FalseComp1_Post_2_binary = if_else(FalseComp1_Post_2 == "False comparison", 1, 0),
+    Anecdotes1_Pre_2_binary = if_else(Anecdotes1_Pre_2 == "Misleading anecdote", 1, 0),
+    Anecdotes1_Post_2_binary = if_else(Anecdotes1_Post_2 == "Misleading anecdote", 1, 0),
+    Combined1_Pre_2_binary = if_else(Combined1_Pre_2 == "False comparison,Misleading anecdote", 1, 0),
+    Combined1_Post_2_binary = if_else(Combined1_Post_2 == "False comparison,Misleading anecdote", 1, 0)
+  ) %>%
+
+  mutate(
+    True1_Pre_2_accuracy = if_else(str_detect(True1_Pre_2, "Post is not manipulative"), 1, 0),
+    True1_Pre_2_accuracy = if_else(
+      str_detect(True2_Pre_2, "Post is not manipulative"),
+      True1_Pre_2_accuracy + 1,
+      True1_Pre_2_accuracy
+    ),
+    True1_Pre_2_accuracy = if_else(
+      !str_detect(MisGraph1_Pre_2, "Post is not manipulative"),
+      True1_Pre_2_accuracy + 1,
+      True1_Pre_2_accuracy
+    ),
+    True1_Pre_2_accuracy = if_else(
+      !str_detect(FalseComp1_Pre_2, "Post is not manipulative"),
+      True1_Pre_2_accuracy + 1,
+      True1_Pre_2_accuracy
+    ),
+    True1_Pre_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Pre_2, "Post is not manipulative"),
+      True1_Pre_2_accuracy + 1,
+      True1_Pre_2_accuracy
+    ),
+    True1_Pre_2_accuracy = if_else(
+      !str_detect(Combined1_Pre_2, "Post is not manipulative"),
+      True1_Pre_2_accuracy + 1,
+      True1_Pre_2_accuracy
+    ),
+    True1_Pre_2_accuracy = True1_Pre_2_accuracy / 6
+  ) %>%
+  mutate (
+    True1_Post_2_accuracy = if_else(str_detect(True1_Post_2, "Post is not manipulative"), 1, 0),
+
+    True1_Post_2_accuracy = if_else(
+      str_detect(True2_Post_2, "Post is not manipulative"),
+      True1_Post_2_accuracy + 1,
+      True1_Post_2_accuracy
+    ),
+    True1_Post_2_accuracy = if_else(
+      !str_detect(MisGraph1_Post_2, "Post is not manipulative"),
+      True1_Post_2_accuracy + 1,
+      True1_Post_2_accuracy
+    ),
+    True1_Post_2_accuracy = if_else(
+      !str_detect(FalseComp1_Post_2, "Post is not manipulative"),
+      True1_Post_2_accuracy + 1,
+      True1_Post_2_accuracy
+    ),
+    True1_Post_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Post_2, "Post is not manipulative"),
+      True1_Post_2_accuracy + 1,
+      True1_Post_2_accuracy
+    ),
+    True1_Post_2_accuracy = if_else(
+      !str_detect(Combined1_Post_2, "Post is not manipulative"),
+      True1_Post_2_accuracy + 1,
+      True1_Post_2_accuracy
+    ),
+    True1_Post_2_accuracy = True1_Post_2_accuracy / 6
+  ) %>%
+  mutate(
+    True2_Pre_2_accuracy = if_else(
+      str_detect(True2_Pre_2, "Post is not manipulative"),
+      1, 0),
+    True2_Pre_2_accuracy = if_else(
+      str_detect(True1_Pre_2, "Post is not manipulative"),
+      True2_Pre_2_accuracy + 1,
+      True2_Pre_2_accuracy
+    ),
+    True2_Pre_2_accuracy = if_else(
+      !str_detect(MisGraph1_Pre_2, "Post is not manipulative"),
+      True2_Pre_2_accuracy + 1,
+      True2_Pre_2_accuracy
+    ),
+    True2_Pre_2_accuracy = if_else(
+      !str_detect(FalseComp1_Pre_2, "Post is not manipulative"),
+      True2_Pre_2_accuracy + 1,
+      True2_Pre_2_accuracy
+    ),
+    True2_Pre_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Pre_2, "Post is not manipulative"),
+      True2_Pre_2_accuracy + 1,
+      True2_Pre_2_accuracy
+    ),
+    True2_Pre_2_accuracy = if_else(
+      !str_detect(Combined1_Pre_2, "Post is not manipulative"),
+      True2_Pre_2_accuracy + 1,
+      True2_Pre_2_accuracy
+    ),
+    True2_Pre_2_accuracy = True2_Pre_2_accuracy / 6
+  ) %>%
+  mutate (
+    True2_Post_2_accuracy = if_else(
+      str_detect(True2_Post_2, "Post is not manipulative"),
+      1, 0),
+    True2_Post_2_accuracy = if_else(
+      str_detect(True1_Post_2, "Post is not manipulative"),
+      True2_Post_2_accuracy + 1,
+      True2_Post_2_accuracy
+    ),
+    True2_Post_2_accuracy = if_else(
+      !str_detect(MisGraph1_Post_2, "Post is not manipulative"),
+      True2_Post_2_accuracy + 1,
+      True2_Post_2_accuracy
+    ),
+    True2_Post_2_accuracy = if_else(
+      !str_detect(FalseComp1_Post_2, "Post is not manipulative"),
+      True2_Post_2_accuracy + 1,
+      True2_Post_2_accuracy
+    ),
+    True2_Post_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Post_2, "Post is not manipulative"),
+      True2_Post_2_accuracy + 1,
+      True2_Post_2_accuracy
+    ),
+    True2_Post_2_accuracy = if_else(
+      !str_detect(Combined1_Post_2, "Post is not manipulative"),
+      True2_Post_2_accuracy + 1,
+      True2_Post_2_accuracy
+    ),
+    True2_Post_2_accuracy = True2_Post_2_accuracy / 6
+  ) %>%
+  mutate(
+    MisGraph1_Pre_2_accuracy = if_else(str_detect(
+      MisGraph1_Pre_2, "Manipulative graph"),
+      1, 0),
+    MisGraph1_Pre_2_accuracy = if_else(
+      !str_detect(True1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_accuracy + 1,
+      MisGraph1_Pre_2_accuracy
+    ),
+    MisGraph1_Pre_2_accuracy = if_else(
+      !str_detect(True2_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_accuracy + 1,
+      MisGraph1_Pre_2_accuracy
+    ),
+    MisGraph1_Pre_2_accuracy = if_else(
+      !str_detect(FalseComp1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_accuracy + 1,
+      MisGraph1_Pre_2_accuracy
+    ),
+    MisGraph1_Pre_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_accuracy + 1,
+      MisGraph1_Pre_2_accuracy
+    ),
+    MisGraph1_Pre_2_accuracy = if_else(
+      !str_detect(Combined1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_accuracy + 1,
+      MisGraph1_Pre_2_accuracy
+    ),
+    MisGraph1_Pre_2_accuracy = MisGraph1_Pre_2_accuracy / 6
+  ) %>%
+  mutate (
+    MisGraph1_Post_2_accuracy = if_else(
+      str_detect(MisGraph1_Post_2, "Manipulative graph"),
+      1, 0),
+    MisGraph1_Post_2_accuracy = if_else(
+      !str_detect(True1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_accuracy + 1,
+      MisGraph1_Post_2_accuracy
+    ),
+    MisGraph1_Post_2_accuracy = if_else(
+      !str_detect(True2_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_accuracy + 1,
+      MisGraph1_Post_2_accuracy
+    ),
+    MisGraph1_Post_2_accuracy = if_else(
+      !str_detect(FalseComp1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_accuracy + 1,
+      MisGraph1_Post_2_accuracy
+    ),
+    MisGraph1_Post_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_accuracy + 1,
+      MisGraph1_Post_2_accuracy
+    ),
+    MisGraph1_Post_2_accuracy = if_else(
+      !str_detect(Combined1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_accuracy + 1,
+      MisGraph1_Post_2_accuracy
+    ),
+    MisGraph1_Post_2_accuracy = MisGraph1_Post_2_accuracy / 6
+  ) %>%
+  mutate(
+    FalseComp1_Pre_2_accuracy = if_else(
+      str_detect(FalseComp1_Pre_2, "False comparison"),
+      1, 0),
+    FalseComp1_Pre_2_accuracy = if_else(
+      !str_detect(True1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_accuracy + 1,
+      FalseComp1_Pre_2_accuracy
+    ),
+    FalseComp1_Pre_2_accuracy = if_else(
+      !str_detect(True2_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_accuracy + 1,
+      FalseComp1_Pre_2_accuracy
+    ),
+    FalseComp1_Pre_2_accuracy = if_else(
+      !str_detect(MisGraph1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_accuracy + 1,
+      FalseComp1_Pre_2_accuracy
+    ),
+    FalseComp1_Pre_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_accuracy + 1,
+      FalseComp1_Pre_2_accuracy
+    ),
+    FalseComp1_Pre_2_accuracy = if_else(
+      str_detect(Combined1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_accuracy + 1,
+      FalseComp1_Pre_2_accuracy
+    ),
+    FalseComp1_Pre_2_accuracy = FalseComp1_Pre_2_accuracy / 6
+  ) %>%
+  mutate (
+    FalseComp1_Post_2_accuracy = if_else(
+      str_detect(FalseComp1_Post_2, "False comparison"),
+      1, 0),
+    FalseComp1_Post_2_accuracy = if_else(
+      !str_detect(True1_Post_2, "False comparison"),
+      FalseComp1_Post_2_accuracy + 1,
+      FalseComp1_Post_2_accuracy
+    ),
+    FalseComp1_Post_2_accuracy = if_else(
+      !str_detect(True2_Post_2, "False comparison"),
+      FalseComp1_Post_2_accuracy + 1,
+      FalseComp1_Post_2_accuracy
+    ),
+    FalseComp1_Post_2_accuracy = if_else(
+      !str_detect(MisGraph1_Post_2, "False comparison"),
+      FalseComp1_Post_2_accuracy + 1,
+      FalseComp1_Post_2_accuracy
+    ),
+    FalseComp1_Post_2_accuracy = if_else(
+      !str_detect(Anecdotes1_Post_2, "False comparison"),
+      FalseComp1_Post_2_accuracy + 1,
+      FalseComp1_Post_2_accuracy
+    ),
+    FalseComp1_Post_2_accuracy = if_else(
+      str_detect(Combined1_Post_2, "False comparison"),
+      FalseComp1_Post_2_accuracy + 1,
+      FalseComp1_Post_2_accuracy
+    ),
+    FalseComp1_Post_2_accuracy = FalseComp1_Post_2_accuracy / 6
+  ) %>%
+  mutate(
+    Anecdotes1_Pre_2_accuracy = if_else(
+      str_detect(Anecdotes1_Pre_2, "Misleading anecdote"),
+      1, 0),
+    Anecdotes1_Pre_2_accuracy = if_else(
+      !str_detect(True1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_accuracy + 1,
+      Anecdotes1_Pre_2_accuracy
+    ),
+    Anecdotes1_Pre_2_accuracy = if_else(
+      !str_detect(True2_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_accuracy + 1,
+      Anecdotes1_Pre_2_accuracy
+    ),
+    Anecdotes1_Pre_2_accuracy = if_else(
+      !str_detect(FalseComp1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_accuracy + 1,
+      Anecdotes1_Pre_2_accuracy
+    ),
+    Anecdotes1_Pre_2_accuracy = if_else(
+      !str_detect(MisGraph1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_accuracy + 1,
+      Anecdotes1_Pre_2_accuracy
+    ),
+    Anecdotes1_Pre_2_accuracy = if_else(
+      str_detect(Combined1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_accuracy + 1,
+      Anecdotes1_Pre_2_accuracy
+    ),
+    Anecdotes1_Pre_2_accuracy = Anecdotes1_Pre_2_accuracy / 6
+  ) %>%
+  mutate (
+    Anecdotes1_Post_2_accuracy = if_else(
+      str_detect(Anecdotes1_Post_2, "Misleading anecdote"),
+      1, 0),
+    Anecdotes1_Post_2_accuracy = if_else(
+      !str_detect(True1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_accuracy + 1,
+      Anecdotes1_Post_2_accuracy
+    ),
+    Anecdotes1_Post_2_accuracy = if_else(
+      !str_detect(True2_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_accuracy + 1,
+      Anecdotes1_Post_2_accuracy
+    ),
+    Anecdotes1_Post_2_accuracy = if_else(
+      !str_detect(FalseComp1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_accuracy + 1,
+      Anecdotes1_Post_2_accuracy
+    ),
+    Anecdotes1_Post_2_accuracy = if_else(
+      !str_detect(MisGraph1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_accuracy + 1,
+      Anecdotes1_Post_2_accuracy
+    ),
+    Anecdotes1_Post_2_accuracy = if_else(
+      str_detect(Combined1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_accuracy + 1,
+      Anecdotes1_Post_2_accuracy
+    ),
+    Anecdotes1_Post_2_accuracy = Anecdotes1_Post_2_accuracy / 6
+  ) %>%
+  mutate(
+    MisGraph1_Pre_2_tp = if_else(
+      str_detect(MisGraph1_Pre_2, "Manipulative graph"),
+      1, 0),
+    MisGraph1_Pre_2_fp = if_else(
+      str_detect(Combined1_Pre_2, "Manipulative graph"),
+      1,
+      0
+    ),
+    MisGraph1_Pre_2_fp = if_else(
+      str_detect(True1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_fp + 1,
+      MisGraph1_Pre_2_fp
+    ),
+    MisGraph1_Pre_2_fp = if_else(
+      str_detect(True2_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_fp + 1,
+      MisGraph1_Pre_2_fp
+    ),
+    MisGraph1_Pre_2_fp = if_else(
+      str_detect(FalseComp1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_fp + 1,
+      MisGraph1_Pre_2_fp
+    ),
+    MisGraph1_Pre_2_fp = if_else(
+      str_detect(Anecdotes1_Pre_2, "Manipulative graph"),
+      MisGraph1_Pre_2_fp + 1,
+      MisGraph1_Pre_2_fp
+    ),
+    MisGraph1_Pre_2_precision = MisGraph1_Pre_2_tp / (MisGraph1_Pre_2_tp + MisGraph1_Pre_2_fp),
+    MisGraph1_Pre_2_recall = MisGraph1_Pre_2_tp
+  ) %>%
+  mutate(
+    MisGraph1_Post_2_tp = if_else(str_detect(
+      MisGraph1_Post_2, "Manipulative graph"),
+      1, 0),
+    MisGraph1_Post_2_fp = if_else(
+      str_detect(Combined1_Post_2, "Manipulative graph"),
+      1,
+      0
+    ),
+    MisGraph1_Post_2_fp = if_else(
+      str_detect(True1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_fp + 1,
+      MisGraph1_Post_2_fp
+    ),
+    MisGraph1_Post_2_fp = if_else(
+      str_detect(True2_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_fp + 1,
+      MisGraph1_Post_2_fp
+    ),
+    MisGraph1_Post_2_fp = if_else(
+      str_detect(FalseComp1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_fp + 1,
+      MisGraph1_Post_2_fp
+    ),
+    MisGraph1_Post_2_fp = if_else(
+      str_detect(Anecdotes1_Post_2, "Manipulative graph"),
+      MisGraph1_Post_2_fp + 1,
+      MisGraph1_Post_2_fp
+    ),
+    MisGraph1_Post_2_precision = MisGraph1_Post_2_tp / (MisGraph1_Post_2_tp + MisGraph1_Post_2_fp),
+    MisGraph1_Post_2_recall = MisGraph1_Post_2_tp
+  ) %>%
+  mutate(
+    FalseComp1_Pre_2_tp = if_else(
+      str_detect(FalseComp1_Pre_2, "False comparison"),
+      1, 0),
+    FalseComp1_Pre_2_tp = if_else(
+      str_detect(Combined1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_tp + 1,
+      FalseComp1_Pre_2_tp
+    ),
+    FalseComp1_Pre_2_fp = if_else(
+      str_detect(True1_Pre_2, "False comparison"),
+      1,
+      0
+    ),
+    FalseComp1_Pre_2_fp = if_else(
+      str_detect(True2_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_fp + 1,
+      FalseComp1_Pre_2_fp
+    ),
+    FalseComp1_Pre_2_fp = if_else(
+      str_detect(MisGraph1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_fp + 1,
+      FalseComp1_Pre_2_fp
+    ),
+    FalseComp1_Pre_2_fp = if_else(
+      str_detect(Anecdotes1_Pre_2, "False comparison"),
+      FalseComp1_Pre_2_fp + 1,
+      FalseComp1_Pre_2_fp
+    ),
+    FalseComp1_Pre_2_precision = FalseComp1_Pre_2_tp / (FalseComp1_Pre_2_tp + FalseComp1_Pre_2_fp),
+    FalseComp1_Pre_2_recall = FalseComp1_Pre_2_tp / 2
+  ) %>%
+  mutate(
+    FalseComp1_Post_2_tp = if_else(
+      str_detect(FalseComp1_Post_2, "False comparison"),
+      1, 0),
+    FalseComp1_Post_2_tp = if_else(
+      str_detect(Combined1_Post_2, "False comparison"),
+      FalseComp1_Post_2_tp + 1,
+      FalseComp1_Post_2_tp
+    ),
+    FalseComp1_Post_2_fp = if_else(
+      str_detect(True1_Post_2, "False comparison"),
+      1,
+      0
+    ),
+    FalseComp1_Post_2_fp = if_else(
+      str_detect(True2_Post_2, "False comparison"),
+      FalseComp1_Post_2_fp + 1,
+      FalseComp1_Post_2_fp
+    ),
+    FalseComp1_Post_2_fp = if_else(
+      str_detect(MisGraph1_Post_2, "False comparison"),
+      FalseComp1_Post_2_fp + 1,
+      FalseComp1_Post_2_fp
+    ),
+    FalseComp1_Post_2_fp = if_else(
+      str_detect(Anecdotes1_Post_2, "False comparison"),
+      FalseComp1_Post_2_fp + 1,
+      FalseComp1_Post_2_fp
+    ),
+    FalseComp1_Post_2_precision = FalseComp1_Post_2_tp / (FalseComp1_Post_2_tp + FalseComp1_Post_2_fp),
+    FalseComp1_Post_2_recall = FalseComp1_Post_2_tp / 2
+  ) %>%
+  mutate(
+    Anecdotes1_Pre_2_tp = if_else(
+      str_detect(Anecdotes1_Pre_2, "Misleading anecdote"),
+      1, 0),
+    Anecdotes1_Pre_2_tp = if_else(
+      str_detect(Combined1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_tp + 1,
+      Anecdotes1_Pre_2_tp
+    ),
+    Anecdotes1_Pre_2_fp = if_else(
+      str_detect(True1_Pre_2, "Misleading anecdote"),
+      1,
+      0
+    ),
+    Anecdotes1_Pre_2_fp = if_else(
+      str_detect(True2_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_fp + 1,
+      Anecdotes1_Pre_2_fp
+    ),
+    Anecdotes1_Pre_2_fp = if_else(
+      str_detect(MisGraph1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_fp + 1,
+      Anecdotes1_Pre_2_fp
+    ),
+    Anecdotes1_Pre_2_fp = if_else(
+      str_detect(FalseComp1_Pre_2, "Misleading anecdote"),
+      Anecdotes1_Pre_2_fp + 1,
+      Anecdotes1_Pre_2_fp
+    ),
+    Anecdotes1_Pre_2_precision = Anecdotes1_Pre_2_tp / (Anecdotes1_Pre_2_tp + Anecdotes1_Pre_2_fp),
+    Anecdotes1_Pre_2_recall = Anecdotes1_Pre_2_tp / 2
+  ) %>%
+  mutate(
+    Anecdotes1_Post_2_tp = if_else(
+      str_detect(Anecdotes1_Post_2, "Misleading anecdote"),
+      1, 0),
+    Anecdotes1_Post_2_tp = if_else(
+      str_detect(Combined1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_tp + 1,
+      Anecdotes1_Post_2_tp
+    ),
+    Anecdotes1_Post_2_fp = if_else(
+      str_detect(True1_Post_2, "Misleading anecdote"),
+      1,
+      0
+    ),
+    Anecdotes1_Post_2_fp = if_else(
+      str_detect(True2_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_fp + 1,
+      Anecdotes1_Post_2_fp
+    ),
+    Anecdotes1_Post_2_fp = if_else(
+      str_detect(MisGraph1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_fp + 1,
+      Anecdotes1_Post_2_fp
+    ),
+    Anecdotes1_Post_2_fp = if_else(
+      str_detect(FalseComp1_Post_2, "Misleading anecdote"),
+      Anecdotes1_Post_2_fp + 1,
+      Anecdotes1_Post_2_fp
+    ),
+    Anecdotes1_Post_2_precision = Anecdotes1_Post_2_tp / (Anecdotes1_Post_2_tp + Anecdotes1_Post_2_fp),
+    Anecdotes1_Post_2_recall = Anecdotes1_Post_2_tp / 2
+  ) %>%
+  mutate(
+    True1_Delta_2 = True1_Post_2_binary - True1_Pre_2_binary,
+    True2_Delta_2 = True2_Post_2_binary - True2_Pre_2_binary,
+    MisGraph1_Delta_2 = MisGraph1_Post_2_binary - MisGraph1_Pre_2_binary,
+    FalseComp1_Delta_2 = FalseComp1_Post_2_binary - FalseComp1_Pre_2_binary,
+    Anecdotes1_Delta_2 = Anecdotes1_Post_2_binary - Anecdotes1_Pre_2_binary,
+    Combined1_Delta_2 = Combined1_Post_2_binary - Combined1_Pre_2_binary,
+    # True1_Delta_2_accuracy = True1_Post_2_accuracy - True1_Pre_2_accuracy,
+    # True2_Delta_2_accuracy = True2_Post_2_accuracy - True2_Pre_2_accuracy,
+    MisGraph1_Delta_2_accuracy = MisGraph1_Post_2_accuracy - MisGraph1_Pre_2_accuracy,
+    FalseComp1_Delta_2_accuracy = FalseComp1_Post_2_accuracy - FalseComp1_Pre_2_accuracy,
+    Anecdotes1_Delta_2_accuracy = Anecdotes1_Post_2_accuracy - Anecdotes1_Pre_2_accuracy,
+    MisGraph1_Delta_2_precision = MisGraph1_Post_2_precision - MisGraph1_Pre_2_precision,
+    FalseComp1_Delta_2_precision = FalseComp1_Post_2_precision - FalseComp1_Pre_2_precision,
+    Anecdotes1_Delta_2_precision = Anecdotes1_Post_2_precision - Anecdotes1_Pre_2_precision,
+    MisGraph1_Delta_2_recall = MisGraph1_Post_2_recall - MisGraph1_Pre_2_recall,
+    FalseComp1_Delta_2_recall = FalseComp1_Post_2_recall - FalseComp1_Pre_2_recall,
+    Anecdotes1_Delta_2_recall = Anecdotes1_Post_2_recall - Anecdotes1_Pre_2_recall,
+    tactics_Delta = MisGraph1_Delta_2_accuracy + FalseComp1_Delta_2_accuracy + Anecdotes1_Delta_2_accuracy
+    # tactics_pre = True1_Pre_2_binary + True2_Pre_2_binary + MisGraph1_Pre_2_binary + FalseComp1_Pre_2_binary + Anecdotes1_Pre_2_binary + Combined1_Pre_2_binary,
+    # tactics_post = True1_Post_2_binary + True2_Post_2_binary + MisGraph1_Post_2_binary + FalseComp1_Post_2_binary + Anecdotes1_Post_2_binary + Combined1_Post_2_binary,
+    # tactics_Delta = tactics_post - tactics_pre,
+    # tactics_Delta_2 = True1_Delta_2 + True2_Delta_2 + MisGraph1_Delta_2 + FalseComp1_Delta_2 + Anecdotes1_Delta_2 + Combined1_Delta_2
+  ) %>% 
+  mutate(
+      mean_Delta_1 = (
+        True1_Delta_1 + True2_Delta_1 + MisGraph1_Delta_1 + FalseComp1_Delta_1 + Anecdotes1_Delta_1 + Combined1_Delta_1
+      ) / 6,
+      mean_Delta_1_False = (
+        MisGraph1_Delta_1 + FalseComp1_Delta_1 + Anecdotes1_Delta_1 + Combined1_Delta_1
+      ) / 4,
+      mean_Delta_1_True = (True1_Delta_1 + True2_Delta_1) / 2,
+      mean_Delta_3a = (
+        True1_Delta_3a + True2_Delta_3a +
+          MisGraph1_Delta_3a + FalseComp1_Delta_3a + Anecdotes1_Delta_3a + Combined1_Delta_3a
+      ) / 6,
+      mean_Delta_3b = (
+        True1_Delta_3b + True2_Delta_3b +
+          MisGraph1_Delta_3b + FalseComp1_Delta_3b + Anecdotes1_Delta_3b + Combined1_Delta_3b
+      ) / 6,
+      mean_Delta_3a_False = (
+        MisGraph1_Delta_3a + FalseComp1_Delta_3a + Anecdotes1_Delta_3a + Combined1_Delta_3a
+      ) / 4,
+      mean_Delta_3b_False = (
+        MisGraph1_Delta_3b + FalseComp1_Delta_3b + Anecdotes1_Delta_3b + Combined1_Delta_3b
+      ) / 4
+    )
+```
+
+
+```{r, result='hide'}
+# Old proportion calculation per question
+# df <- df %>%
+#   mutate(
+#     True1_Pre_2_binary = if_else(True1_Pre_2 == "Post is not manipulative", 1, 0),
+#     True1_Post_2_binary = if_else(True1_Post_2 == "Post is not manipulative", 1, 0),
+#     True2_Pre_2_binary = if_else(True2_Pre_2 == "Post is not manipulative", 1, 0),
+#     True2_Post_2_binary = if_else(True2_Post_2 == "Post is not manipulative", 1, 0),
+#     MisGraph1_Pre_2_binary = if_else(MisGraph1_Pre_2 == "Manipulative graph", 1, 0),
+#     MisGraph1_Post_2_binary = if_else(MisGraph1_Post_2 == "Manipulative graph", 1, 0),
+#     FalseComp1_Pre_2_binary = if_else(FalseComp1_Pre_2 == "False comparison", 1, 0),
+#     FalseComp1_Post_2_binary = if_else(FalseComp1_Post_2 == "False comparison", 1, 0),
+#     Anecdotes1_Pre_2_binary = if_else(Anecdotes1_Pre_2 == "Misleading anecdote", 1, 0),
+#     Anecdotes1_Post_2_binary = if_else(Anecdotes1_Post_2 == "Misleading anecdote", 1, 0),
+#     Combined1_Pre_2_binary = if_else(Combined1_Pre_2 == "False comparison,Misleading anecdote", 1, 0),
+#     Combined1_Post_2_binary = if_else(Combined1_Post_2 == "False comparison,Misleading anecdote", 1, 0)
+#   ) %>%
+#   mutate(
+#     True1_Pre_2_proportion = if_else(str_detect(True1_Pre_2, "Post is not manipulative"), 1, 0),
+#     True1_Pre_2_proportion = if_else(
+#       !str_detect(True1_Pre_2, "Manipulative graph"),
+#       True1_Pre_2_proportion + 1,
+#       True1_Pre_2_proportion
+#     ),
+#     True1_Pre_2_proportion = if_else(
+#       !str_detect(True1_Pre_2, "False comparison"),
+#       True1_Pre_2_proportion + 1,
+#       True1_Pre_2_proportion
+#     ),
+#     True1_Pre_2_proportion = if_else(
+#       !str_detect(True1_Pre_2, "Misleading anecdote"),
+#       True1_Pre_2_proportion + 1,
+#       True1_Pre_2_proportion
+#     ),
+#     True1_Pre_2_proportion = if_else(
+#       !str_detect(True1_Pre_2, "Evidence taken out of context"),
+#       True1_Pre_2_proportion + 1,
+#       True1_Pre_2_proportion
+#     ),
+#     True1_Pre_2_proportion = True1_Pre_2_proportion / 5,
+#     True2_Pre_2_proportion = if_else(str_detect(True2_Pre_2, "Post is not manipulative"), 1, 0),
+#     True2_Pre_2_proportion = if_else(
+#       !str_detect(True2_Pre_2, "Manipulative graph"),
+#       True2_Pre_2_proportion + 1,
+#       True2_Pre_2_proportion
+#     ),
+#     True2_Pre_2_proportion = if_else(
+#       !str_detect(True2_Pre_2, "False comparison"),
+#       True2_Pre_2_proportion + 1,
+#       True2_Pre_2_proportion
+#     ),
+#     True2_Pre_2_proportion = if_else(
+#       !str_detect(True2_Pre_2, "Misleading anecdote"),
+#       True2_Pre_2_proportion + 1,
+#       True2_Pre_2_proportion
+#     ),
+#     True2_Pre_2_proportion = if_else(
+#       !str_detect(True2_Pre_2, "Evidence taken out of context"),
+#       True2_Pre_2_proportion + 1,
+#       True2_Pre_2_proportion
+#     ),
+#     True2_Pre_2_proportion = True2_Pre_2_proportion / 5,
+#     True1_Post_2_proportion = if_else(str_detect(True1_Post_2, "Post is not manipulative"), 1, 0),
+#     True1_Post_2_proportion = if_else(
+#       !str_detect(True1_Post_2, "Manipulative graph"),
+#       True1_Post_2_proportion + 1,
+#       True1_Post_2_proportion
+#     ),
+#     True1_Post_2_proportion = if_else(
+#       !str_detect(True1_Post_2, "False comparison"),
+#       True1_Post_2_proportion + 1,
+#       True1_Post_2_proportion
+#     ),
+#     True1_Post_2_proportion = if_else(
+#       !str_detect(True1_Post_2, "Misleading anecdote"),
+#       True1_Post_2_proportion + 1,
+#       True1_Post_2_proportion
+#     ),
+#     True1_Post_2_proportion = if_else(
+#       !str_detect(True1_Post_2, "Evidence taken out of context"),
+#       True1_Post_2_proportion + 1,
+#       True1_Post_2_proportion
+#     ),
+#     True1_Post_2_proportion = True1_Post_2_proportion / 5,
+#     True2_Post_2_proportion = if_else(str_detect(True2_Post_2, "Post is not manipulative"), 1, 0),
+#     True2_Post_2_proportion = if_else(
+#       !str_detect(True2_Post_2, "Manipulative graph"),
+#       True2_Post_2_proportion + 1,
+#       True2_Post_2_proportion
+#     ),
+#     True2_Post_2_proportion = if_else(
+#       !str_detect(True2_Post_2, "False comparison"),
+#       True2_Post_2_proportion + 1,
+#       True2_Post_2_proportion
+#     ),
+#     True2_Post_2_proportion = if_else(
+#       !str_detect(True2_Post_2, "Misleading anecdote"),
+#       True2_Post_2_proportion + 1,
+#       True2_Post_2_proportion
+#     ),
+#     True2_Post_2_proportion = if_else(
+#       !str_detect(True2_Post_2, "Evidence taken out of context"),
+#       True2_Post_2_proportion + 1,
+#       True2_Post_2_proportion
+#     ),
+#     True2_Post_2_proportion = True2_Post_2_proportion / 5
+#   ) %>%
+#   mutate(
+#     MisGraph1_Pre_2_proportion = if_else(!str_detect(
+#       MisGraph1_Pre_2, "Post is not manipulative"
+#     ), 1, 0),
+#     MisGraph1_Pre_2_proportion = if_else(
+#       str_detect(MisGraph1_Pre_2, "Manipulative graph"),
+#       MisGraph1_Pre_2_proportion + 1,
+#       MisGraph1_Pre_2_proportion
+#     ),
+#     MisGraph1_Pre_2_proportion = if_else(
+#       !str_detect(MisGraph1_Pre_2, "False comparison"),
+#       MisGraph1_Pre_2_proportion + 1,
+#       MisGraph1_Pre_2_proportion
+#     ),
+#     MisGraph1_Pre_2_proportion = if_else(
+#       !str_detect(MisGraph1_Pre_2, "Misleading anecdote"),
+#       MisGraph1_Pre_2_proportion + 1,
+#       MisGraph1_Pre_2_proportion
+#     ),
+#     MisGraph1_Pre_2_proportion = if_else(
+#       !str_detect(MisGraph1_Pre_2, "Evidence taken out of context"),
+#       MisGraph1_Pre_2_proportion + 1,
+#       MisGraph1_Pre_2_proportion
+#     ),
+#     MisGraph1_Pre_2_proportion = MisGraph1_Pre_2_proportion / 5,
+#     MisGraph1_Post_2_proportion = if_else(!str_detect(
+#       MisGraph1_Post_2, "Post is not manipulative"
+#     ), 1, 0),
+#     MisGraph1_Post_2_proportion = if_else(
+#       str_detect(MisGraph1_Post_2, "Manipulative graph"),
+#       MisGraph1_Post_2_proportion + 1,
+#       MisGraph1_Post_2_proportion
+#     ),
+#     MisGraph1_Post_2_proportion = if_else(
+#       !str_detect(MisGraph1_Post_2, "False comparison"),
+#       MisGraph1_Post_2_proportion + 1,
+#       MisGraph1_Post_2_proportion
+#     ),
+#     MisGraph1_Post_2_proportion = if_else(
+#       !str_detect(MisGraph1_Post_2, "Misleading anecdote"),
+#       MisGraph1_Post_2_proportion + 1,
+#       MisGraph1_Post_2_proportion
+#     ),
+#     MisGraph1_Post_2_proportion = if_else(
+#       !str_detect(MisGraph1_Post_2, "Evidence taken out of context"),
+#       MisGraph1_Post_2_proportion + 1,
+#       MisGraph1_Post_2_proportion
+#     ),
+#     MisGraph1_Post_2_proportion = MisGraph1_Post_2_proportion / 5
+#   ) %>%
+#   mutate(
+#     FalseComp1_Pre_2_proportion = if_else(!str_detect(
+#       FalseComp1_Pre_2, "Post is not manipulative"
+#     ), 1, 0),
+#     FalseComp1_Pre_2_proportion = if_else(
+#       !str_detect(FalseComp1_Pre_2, "Manipulative graph"),
+#       FalseComp1_Pre_2_proportion + 1,
+#       FalseComp1_Pre_2_proportion
+#     ),
+#     FalseComp1_Pre_2_proportion = if_else(
+#       str_detect(FalseComp1_Pre_2, "False comparison"),
+#       FalseComp1_Pre_2_proportion + 1,
+#       FalseComp1_Pre_2_proportion
+#     ),
+#     FalseComp1_Pre_2_proportion = if_else(
+#       !str_detect(FalseComp1_Pre_2, "Misleading anecdote"),
+#       FalseComp1_Pre_2_proportion + 1,
+#       FalseComp1_Pre_2_proportion
+#     ),
+#     FalseComp1_Pre_2_proportion = if_else(
+#       !str_detect(FalseComp1_Pre_2, "Evidence taken out of context"),
+#       FalseComp1_Pre_2_proportion + 1,
+#       FalseComp1_Pre_2_proportion
+#     ),
+#     FalseComp1_Pre_2_proportion = FalseComp1_Pre_2_proportion / 5,
+#     FalseComp1_Post_2_proportion = if_else(!str_detect(
+#       FalseComp1_Post_2, "Post is not manipulative"
+#     ), 1, 0),
+#     FalseComp1_Post_2_proportion = if_else(
+#       !str_detect(FalseComp1_Post_2, "Manipulative graph"),
+#       FalseComp1_Post_2_proportion + 1,
+#       FalseComp1_Post_2_proportion
+#     ),
+#     FalseComp1_Post_2_proportion = if_else(
+#       str_detect(FalseComp1_Post_2, "False comparison"),
+#       FalseComp1_Post_2_proportion + 1,
+#       FalseComp1_Post_2_proportion
+#     ),
+#     FalseComp1_Post_2_proportion = if_else(
+#       !str_detect(FalseComp1_Post_2, "Misleading anecdote"),
+#       FalseComp1_Post_2_proportion + 1,
+#       FalseComp1_Post_2_proportion
+#     ),
+#     FalseComp1_Post_2_proportion = if_else(
+#       !str_detect(FalseComp1_Post_2, "Evidence taken out of context"),
+#       FalseComp1_Post_2_proportion + 1,
+#       FalseComp1_Post_2_proportion
+#     ),
+#     FalseComp1_Post_2_proportion = FalseComp1_Post_2_proportion / 5
+#   ) %>%
+#   mutate(
+#     Anecdotes1_Pre_2_proportion = if_else(!str_detect(
+#       Anecdotes1_Pre_2, "Post is not manipulative"
+#     ), 1, 0),
+#     Anecdotes1_Pre_2_proportion = if_else(
+#       !str_detect(Anecdotes1_Pre_2, "Manipulative graph"),
+#       Anecdotes1_Pre_2_proportion + 1,
+#       Anecdotes1_Pre_2_proportion
+#     ),
+#     Anecdotes1_Pre_2_proportion = if_else(
+#       !str_detect(Anecdotes1_Pre_2, "False comparison"),
+#       Anecdotes1_Pre_2_proportion + 1,
+#       Anecdotes1_Pre_2_proportion
+#     ),
+#     Anecdotes1_Pre_2_proportion = if_else(
+#       str_detect(Anecdotes1_Pre_2, "Misleading anecdote"),
+#       Anecdotes1_Pre_2_proportion + 1,
+#       Anecdotes1_Pre_2_proportion
+#     ),
+#     Anecdotes1_Pre_2_proportion = if_else(
+#       !str_detect(Anecdotes1_Pre_2, "Evidence taken out of context"),
+#       Anecdotes1_Pre_2_proportion + 1,
+#       Anecdotes1_Pre_2_proportion
+#     ),
+#     Anecdotes1_Pre_2_proportion = Anecdotes1_Pre_2_proportion / 5,
+#     Anecdotes1_Post_2_proportion = if_else(!str_detect(
+#       Anecdotes1_Post_2, "Post is not manipulative"
+#     ), 1, 0),
+#     Anecdotes1_Post_2_proportion = if_else(
+#       !str_detect(Anecdotes1_Post_2, "Manipulative graph"),
+#       Anecdotes1_Post_2_proportion + 1,
+#       Anecdotes1_Post_2_proportion
+#     ),
+#     Anecdotes1_Post_2_proportion = if_else(
+#       !str_detect(Anecdotes1_Post_2, "False comparison"),
+#       Anecdotes1_Post_2_proportion + 1,
+#       Anecdotes1_Post_2_proportion
+#     ),
+#     Anecdotes1_Post_2_proportion = if_else(
+#       str_detect(Anecdotes1_Post_2, "Misleading anecdote"),
+#       Anecdotes1_Post_2_proportion + 1,
+#       Anecdotes1_Post_2_proportion
+#     ),
+#     Anecdotes1_Post_2_proportion = if_else(
+#       !str_detect(Anecdotes1_Post_2, "Evidence taken out of context"),
+#       Anecdotes1_Post_2_proportion + 1,
+#       Anecdotes1_Post_2_proportion
+#     ),
+#     Anecdotes1_Post_2_proportion = Anecdotes1_Post_2_proportion / 5
+#   ) %>%
+#   mutate(
+#     Combined1_Pre_2_proportion = if_else(!str_detect(
+#       Combined1_Pre_2, "Post is not manipulative"
+#     ), 1, 0),
+#     Combined1_Pre_2_proportion = if_else(
+#       !str_detect(Combined1_Pre_2, "Manipulative graph"),
+#       Combined1_Pre_2_proportion + 1,
+#       Combined1_Pre_2_proportion
+#     ),
+#     Combined1_Pre_2_proportion = if_else(
+#       str_detect(Combined1_Pre_2, "False comparison"),
+#       Combined1_Pre_2_proportion + 1,
+#       Combined1_Pre_2_proportion
+#     ),
+#     Combined1_Pre_2_proportion = if_else(
+#       str_detect(Combined1_Pre_2, "Misleading anecdote"),
+#       Combined1_Pre_2_proportion + 1,
+#       Combined1_Pre_2_proportion
+#     ),
+#     Combined1_Pre_2_proportion = if_else(
+#       !str_detect(Combined1_Pre_2, "Evidence taken out of context"),
+#       Combined1_Pre_2_proportion + 1,
+#       Combined1_Pre_2_proportion
+#     ),
+#     Combined1_Pre_2_proportion = Combined1_Pre_2_proportion / 5,
+#     Combined1_Post_2_proportion = if_else(!str_detect(
+#       Combined1_Post_2, "Post is not manipulative"
+#     ), 1, 0),
+#     Combined1_Post_2_proportion = if_else(
+#       !str_detect(Combined1_Post_2, "Manipulative graph"),
+#       Combined1_Post_2_proportion + 1,
+#       Combined1_Post_2_proportion
+#     ),
+#     Combined1_Post_2_proportion = if_else(
+#       str_detect(Combined1_Post_2, "False comparison"),
+#       Combined1_Post_2_proportion + 1,
+#       Combined1_Post_2_proportion
+#     ),
+#     Combined1_Post_2_proportion = if_else(
+#       str_detect(Combined1_Post_2, "Misleading anecdote"),
+#       Combined1_Post_2_proportion + 1,
+#       Combined1_Post_2_proportion
+#     ),
+#     Combined1_Post_2_proportion = if_else(
+#       !str_detect(Combined1_Post_2, "Evidence taken out of context"),
+#       Combined1_Post_2_proportion + 1,
+#       Combined1_Post_2_proportion
+#     ),
+#     Combined1_Post_2_proportion = Combined1_Post_2_proportion / 5
+#   ) %>%
+#   mutate(
+#     True1_Delta_2 = True1_Post_2_binary - True1_Pre_2_binary,
+#     True2_Delta_2 = True2_Post_2_binary - True2_Pre_2_binary,
+#     MisGraph1_Delta_2 = MisGraph1_Post_2_binary - MisGraph1_Pre_2_binary,
+#     FalseComp1_Delta_2 = FalseComp1_Post_2_binary - FalseComp1_Pre_2_binary,
+#     Anecdotes1_Delta_2 = Anecdotes1_Post_2_binary - Anecdotes1_Pre_2_binary,
+#     Combined1_Delta_2 = Combined1_Post_2_binary - Combined1_Pre_2_binary,
+#     True1_Delta_2_proportion = True1_Post_2_proportion - True1_Pre_2_proportion,
+#     True2_Delta_2_proportion = True2_Post_2_proportion - True2_Pre_2_proportion,
+#     MisGraph1_Delta_2_proportion = MisGraph1_Post_2_proportion - MisGraph1_Pre_2_proportion,
+#     FalseComp1_Delta_2_proportion = FalseComp1_Post_2_proportion - FalseComp1_Pre_2_proportion,
+#     Anecdotes1_Delta_2_proportion = Anecdotes1_Post_2_proportion - Anecdotes1_Pre_2_proportion,
+#     Combined1_Delta_2_proportion = Combined1_Post_2_proportion - Combined1_Pre_2_proportion,
+#   ) %>%
+#   mutate(
+#     tactics_pre = True1_Pre_2_binary + True2_Pre_2_binary + MisGraph1_Pre_2_binary + FalseComp1_Pre_2_binary + Anecdotes1_Pre_2_binary + Combined1_Pre_2_binary,
+#     tactics_post = True1_Post_2_binary + True2_Post_2_binary + MisGraph1_Post_2_binary + FalseComp1_Post_2_binary + Anecdotes1_Post_2_binary + Combined1_Post_2_binary,
+#     tactics_Delta = tactics_post - tactics_pre,
+#     tactics_Delta_2 = True1_Delta_2 + True2_Delta_2 + MisGraph1_Delta_2 + FalseComp1_Delta_2 + Anecdotes1_Delta_2 + Combined1_Delta_2
+#   ) %>%
+#   mutate(
+#     mean_Delta_1 = (
+#       True1_Delta_1 + True2_Delta_1 + MisGraph1_Delta_1 + FalseComp1_Delta_1 + Anecdotes1_Delta_1 + Combined1_Delta_1
+#     ) / 6,
+#     mean_Delta_1_False = (
+#       MisGraph1_Delta_1 + FalseComp1_Delta_1 + Anecdotes1_Delta_1 + Combined1_Delta_1
+#     ) / 4,
+#     mean_Delta_1_True = (True1_Delta_1 + True2_Delta_1) / 2,
+#     mean_Delta_3a = (
+#       True1_Delta_3a + True2_Delta_3a +
+#         MisGraph1_Delta_3a + FalseComp1_Delta_3a + Anecdotes1_Delta_3a + Combined1_Delta_3a
+#     ) / 6,
+#     mean_Delta_3b = (
+#       True1_Delta_3b + True2_Delta_3b +
+#         MisGraph1_Delta_3b + FalseComp1_Delta_3b + Anecdotes1_Delta_3b + Combined1_Delta_3b
+#     ) / 6,
+#     mean_Delta_3a_False = (
+#       MisGraph1_Delta_3a + FalseComp1_Delta_3a + Anecdotes1_Delta_3a + Combined1_Delta_3a
+#     ) / 4,
+#     mean_Delta_3b_False = (
+#       MisGraph1_Delta_3b + FalseComp1_Delta_3b + Anecdotes1_Delta_3b + Combined1_Delta_3b
+#     ) / 4
+#   )
+```
+
+
+## Time Spent
+
+We process the Timer columns to analyze how long users took for different parts of the survey.
+
+```{r}
+# Convert times to numeric type
+df[, grep('Timer_.*$', colnames(df))] <-
+  df[, grep('Timer_.*$', colnames(df))] %>% mutate_if(is.character, as.numeric)
+
+# Calculate total times for treatment and control courses
+df <- df %>%
+  mutate(
+    Control_Timer_SleepSchedule = Timer_sleepschedul1_Page.Submit + Timer_sleepschedul2_Page.Submit +
+      Timer_sleepschedul3_Page.Submit + Timer_sleepschedul4_Page.Submit,
+    Control_Timer_SleepCaffeine = Timer_sleepcaffine1_Page.Submit + Timer_sleepcaffine2_Page.Submit +
+      Timer_sleepcaffine3_Page.Submit + Timer_sleepcaffine4_Page.Submit,
+    Control_Timer_SleepHours = Timer_sleephours1_Page.Submit + Timer_sleephours2_Page.Submit +
+      Timer_sleephours3_Page.Submit + Timer_sleephours4_Page.Submit,
+    Control_Timer_Total = Timer_control_preint_Page.Submit + Timer_intro_control_Page.Submit +
+      Control_Timer_SleepSchedule + Control_Timer_SleepCaffeine + Control_Timer_SleepHours,
+    Treatment_Timer_MisGraph = Timer_graphs1_Page.Submit + Timer_graphs2_Page.Submit +
+      Timer_graphs3_Page.Submit + Timer_graphs4_Page.Submit,
+    Treatment_Timer_Anecdotes = Timer_anecdotes1_Page.Submit + Timer_anecdotes2_Page.Submit +
+      Timer_anecdotes3_Page.Submit + Timer_anecdotes4_Page.Submit,
+    Treatment_Timer_FalseComp = Timer_falsecomps1_Page.Submit + Timer_falsecomps2_Page.Submit +
+      Timer_falsecomps3_Page.Submit + Timer_falsecomps4_Page.Submit,
+    Treatment_Timer_Total = Timer_treat_preint_Page.Submit + Timer_intro_treat_Page.Submit +
+      Treatment_Timer_MisGraph + Treatment_Timer_Anecdotes + Treatment_Timer_FalseComp
+  )
+
+# Calculate total times for pre and post tests
+df <- df %>%
+  mutate(
+    Pre_Timer_Total = True1_Pre_Timer + True2_Pre_Timer + MisGraph1_Pre_Timer +
+      FalseComp1_Pre_Timer + Anecdotes1_Pre_Timer + Combined1_Pre_Timer,
+    Post_Timer_Total = True1_Post_Timer + True2_Post_Timer + MisGraph1_Post_Timer +
+      FalseComp1_Post_Timer + Anecdotes1_Post_Timer + Combined1_Post_Timer,
+    Delta_Timer_Total = Post_Timer_Total - Pre_Timer_Total
+  )
+```
+
+## Attention Checks
+
+Our survey included two attention checks before treatment/control assignment. The results are captured by the following conditions:
+
+* `attention_miss` == 0 (pass both)  
+* `attention_miss` < 2 (pass at least one)  
+* `ATT1` == 'I don’t remember' (pass first)
+
+The results of these attention checks are summarized below.
+
+```{r}
+df %>% summarize(
+  att1 = sum(ATT1 == 'I don’t remember'),
+  pass_both = sum(attention_miss == 0),
+  pass_one = sum(attention_miss < 2),
+  total = n()
+) %>%
+  mutate(
+    pct_att1 = att1 / total,
+    pct_one = pass_one / total,
+    pct_both = pass_both / total
+  )
+```
+
+We choose to filter for respondents who passed both attention checks. This gives us 641 participants, which is 64.4% of our original pool of respondents. See Attention Check Robustness for more details on what happens when we adjust our attention check criteria.
+
+```{r}
+df_attention <-  df %>%
+  filter(attention_miss == 0)
+```
+
+# Main Results
+
+## Treatment Effect on Identifying Manipulation
+
+### H1 - Identifying Manipulativeness
+
+H1 is that: participants will be more capable of rating misinformation correctly as manipulative after taking the course.
+
+Note that, by construction, we test this hypothesis by only looking at test questions that actually contain manipulative tactics. SH1 will examine the test questions that were factual.
+
+```{r}
+pre_post_individual <- df_attention %>%
+  mutate(
+    pre_mean = (
+      MisGraph1_Pre_1 + FalseComp1_Pre_1 + Anecdotes1_Pre_1 + Combined1_Pre_1
+    ) / 4,
+    post_mean = (
+      MisGraph1_Post_1 + FalseComp1_Post_1 + Anecdotes1_Post_1 + Combined1_Post_1
+    ) / 4
+  )
+
+t.test(pre_post_individual %>% filter(treated == 1) %>% pull(pre_mean)) %>% broom::tidy() %>% mutate(period = "pre", treated = "1") %>%
+  rbind(
+    t.test(pre_post_individual %>% filter(treated == 0) %>% pull(pre_mean)) %>% broom::tidy() %>% mutate(period = "pre", treated = "0")
+  ) %>%
+  rbind(
+    t.test(pre_post_individual %>% filter(treated == 1) %>% pull(post_mean)) %>% broom::tidy() %>% mutate(period = "post", treated = "1")
+  ) %>%
+  rbind(
+    t.test(pre_post_individual %>% filter(treated == 0) %>% pull(post_mean)) %>% broom::tidy() %>% mutate(period = "post", treated = "0")
+  ) %>%
+  mutate(period = factor(period, levels = c("pre", "post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.05)) +
+  geom_line(aes(group = treated)) +
+  scale_color_grey() +
+  labs(
+    title = "H1: Misinformation Identification",
+    subtitle = "Average score on scale 1-6, with 6 being the best",
+    x = "pre- or post-treatment period",
+    y = "Average score"
+  ) +
+  theme_classic()
+```
+
+The table below summarizes the output of the standard t.test function in R:  
+
+* `estimate` represents the delta in the group means (treated vs. control)  
+* `estimate1` is the treated group’s mean delta  
+* `estimate2` is the control group’s mean delta  
+* `statistic` is the test statistic  
+* `p.value` is the unadjusted p-value  
+* `p.value_ajusted` is the p-value with 10 adjustments using the BH correction  
+* `conf.low` and `conf.high` are the bounds of a 95% confidence interval 
+
+These results indicate that those that take our tactics course rate manipulative posts 0.63 points more manipulative on our 6 point scale. This is 12.6% ($0.63/5$) of our 6 point scale and is significant before and after multiple testing adjustments. This finding is also plotted in the figure above. This suggests that participants became more capable of identifying misinformation after taking the course.
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1_False)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+For reference, if we also penalize participants for identifying factual questions as manipulative, then this result is dampened (as illustrated below). This is discussed further with SH1 below. 
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+### SH1 - Misidentifying True
+
+SH1 is that: participants will not identify true content as more manipulative after taking the course.
+
+```{r}
+pre_post_individual <- df_attention %>%
+  mutate(
+    pre_mean_true = ((7 - True1_Pre_1) + (7 - True2_Pre_1)) / 2,
+    pre_mean_false = (
+      MisGraph1_Pre_1 + FalseComp1_Pre_1 + Anecdotes1_Pre_1 + Combined1_Pre_1
+    ) / 4,
+    post_mean_true = ((7 - True1_Post_1) + (7 - True2_Post_1)) / 2,
+    post_mean_false = (
+      MisGraph1_Post_1 + FalseComp1_Post_1 + Anecdotes1_Post_1 + Combined1_Post_1
+    ) / 4
+  )
+
+t.test(pre_post_individual %>% filter(treated == 1) %>% pull(pre_mean_true)) %>% broom::tidy() %>% mutate(period = "pre",
+                                                                                                          treated = "1",
+                                                                                                          type = "Not Misinformation") %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 0) %>% pull(pre_mean_true)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "Not Misinformation"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 1) %>% pull(post_mean_true)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "Not Misinformation"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 0) %>% pull(post_mean_true)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "Not Misinformation"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 1) %>% pull(pre_mean_false)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "Misinformation"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 0) %>% pull(pre_mean_false)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "Misinformation"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 1) %>% pull(post_mean_false)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "Misinformation"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      pre_post_individual %>% filter(treated == 0) %>% pull(post_mean_false)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "Misinformation"
+    )
+  ) %>%
+  mutate(
+    period = factor(period, levels = c("pre", "post")),
+    treated = factor(treated, levels = c("1", "0")),
+    estimate = if_else(type == "Not Misinformation", estimate, estimate),
+    conf.low = if_else(type == "Not Misinformation", conf.low, conf.low),
+    conf.high = if_else(type == "Not Misinformation", conf.high, conf.high)
+  ) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(
+    title = "SH1: Misinformation Identification by True & False Questions",
+    subtitle = "Average score on scale 1-6, with 6 being the best",
+    x = "pre- or post-treatment period",
+    y = "Rated Misinformation Likelihood"
+  ) +
+  theme_classic() +
+  facet_wrap(. ~ type)
+```
+
+Those that take our tactics course also rate true posts 0.77 points more manipulative on our 6 point scale (15.4% ($0.77/5$)). In other words, our treatment also caused people to be more suspicious of factual information, and so in all information 
+
+This effect may be a result of priming and might not last as long as the knowledge they gained about identifying misinformation. This result may also be the result of the experimenter demand effect. Thus, we cannot tell apart whether either of these effects is driving the results, or if it is because participants became generally skeptical of all information. In any case, this is something First Draft should be aware of. This finding is plotted in the figure above alongside the result for test questions with misinformation. As illustrated, treated participants became more likely to identify true and false statements as misinformation in the post-test.
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1_True),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1_True)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+### Breakdown by Question
+
+To get a better understanding of treatment effect on different types of questions, we look at the change in manipulativeness for each question category.
+
+We see that the graph questions result in the largest increase in manipulative answers for both misinfo and true questions (True1 has a valid graph).
+
+```{r}
+pre_post_individual %>%
+  mutate(
+    True1_Pre_1 = 7 - True1_Pre_1,
+    True2_Pre_1 = 7 - True2_Pre_1,
+    True1_Post_1 = 7 - True1_Post_1,
+    True2_Post_1 = 7 - True2_Post_1
+  ) %>%
+  dplyr::select(
+    treated,
+    MisGraph1_Pre_1,
+    FalseComp1_Pre_1,
+    Anecdotes1_Pre_1,
+    Combined1_Pre_1,
+    MisGraph1_Post_1,
+    FalseComp1_Post_1,
+    Anecdotes1_Post_1,
+    Combined1_Post_1,
+    True1_Pre_1,
+    True2_Pre_1,
+    True1_Post_1,
+    True2_Post_1
+  ) %>%
+  filter(treated == 1) %>%
+  select_if(is.numeric) %>%
+  map_df(~ broom::tidy(t.test(.)), .id = 'var') %>%
+  mutate(treated = "1") %>%
+  rbind(
+    pre_post_individual %>%
+      mutate(
+        True1_Pre_1 = 7 - True1_Pre_1,
+        True2_Pre_1 = 7 - True2_Pre_1,
+        True1_Post_1 = 7 - True1_Post_1,
+        True2_Post_1 = 7 - True2_Post_1
+      ) %>%
+      dplyr::select(
+        treated,
+        MisGraph1_Pre_1,
+        FalseComp1_Pre_1,
+        Anecdotes1_Pre_1,
+        Combined1_Pre_1,
+        MisGraph1_Post_1,
+        FalseComp1_Post_1,
+        Anecdotes1_Post_1,
+        Combined1_Post_1,
+        True1_Pre_1,
+        True2_Pre_1,
+        True1_Post_1,
+        True2_Post_1
+      ) %>%
+      filter(treated == 0) %>%
+      select_if(is.numeric) %>%
+      map_df(~ broom::tidy(t.test(.)), .id = 'var') %>%
+      mutate(treated = "0")
+  ) %>%
+  separate(var, into = c("type", "period")) %>%
+  mutate(period = factor(period, levels = c("Pre", "Post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(
+    title = "Misinformation Identification by Question",
+    subtitle = "Average score on scale 1-6, with 6 being the best",
+    x = "pre- or post-treatment period",
+    y = "Average score"
+  ) +
+  theme_classic() +
+  facet_wrap(. ~ type)
+```
+
+### Deep Dive into Score Distributions
+
+We explore the score distributions of both pre and post-test to gain a better understanding of what answers participants were putting down. We look at the treated group's pre-treatment distribution of answers to non-manipulative questions and manipulative questions.
+
+```{r}
+pre_true <-
+  c(7 - df[df$treated == 1, 'True1_Pre_1'], 7 - df[df$treated == 1, 'True2_Pre_1'])
+pre_misinfo <-
+  c(df[df$treated == 1, 'MisGraph1_Pre_1'], df[df$treated == 1, 'Anecdotes1_Pre_1'], df[df$treated == 1, 'FalseComp1_Pre_1'], df[df$treated == 1, 'Combined1_Pre_1'])
+
+pre_true_graph <- ggplot(data.frame(pre_true), aes(x = pre_true)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Non-Manipulative Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+pre_misinfo_graph <-
+  ggplot(data.frame(pre_misinfo), aes(x = pre_misinfo)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Manipulative Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+grid.arrange(pre_true_graph,
+             pre_misinfo_graph,
+             ncol = 2,
+             top = 'Distribution of Pre-Test Scores')
+```
+As we can see, pre-test scores for non-manipulative posts are skewed right whereas distribution of pre-test scores for manipulative posts are relatively uniform.
+
+If we look at the Post-Test score distributions, we see that there is a clear shift towards "6 definitely manipulative" for many of the manipulative posts. There is also a shift for non-manipulative posts, and while on average the size of the changes are similar, they are not concentrated at the value 6.
+
+```{r}
+post_true <-
+  c(7 - df[df$treated == 1, 'True1_Post_1'], 7 - df[df$treated == 1, 'True2_Post_1'])
+post_misinfo <-
+  c(df[df$treated == 1, 'MisGraph1_Post_1'], df[df$treated == 1, 'Anecdotes1_Post_1'], df[df$treated == 1, 'FalseComp1_Post_1'], df[df$treated == 1, 'Combined1_Post_1'])
+
+post_true_graph <- ggplot(data.frame(post_true), aes(x = post_true)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Non-Manipulative Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+post_misinfo_graph <-
+  ggplot(data.frame(post_misinfo), aes(x = post_misinfo)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Manipulative Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+
+grid.arrange(post_true_graph,
+             post_misinfo_graph,
+             ncol = 2,
+             top = 'Distribution of Post-Test Scores')
+```
+We can also look at the change in score between true and misinfo posts. Both look similar with true having a larger amount of 5 point increases.
+
+```{r}
+delta_true <-
+  c(-1 * df[df$treated == 1, 'True1_Delta_1'], -1 * df[df$treated == 1, 'True2_Delta_1'])
+delta_misinfo <-
+  c(df[df$treated == 1, 'MisGraph1_Delta_1'], df[df$treated == 1, 'Anecdotes1_Delta_1'], df[df$treated == 1, 'FalseComp1_Delta_1'], df[df$treated == 1, 'Combined1_Delta_1'])
+
+delta_true_graph <-
+  ggplot(data.frame(delta_true), aes(x = delta_true)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Non-Manipulative Posts') +
+  xlab('Change in Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(-5, 5, by = 1))
+
+delta_misinfo_graph <-
+  ggplot(data.frame(delta_misinfo), aes(x = delta_misinfo)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Manipulative Posts') +
+  xlab('Change in Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(-5, 5, by = 1))
+
+grid.arrange(delta_true_graph,
+             delta_misinfo_graph,
+             ncol = 2,
+             top = 'Distribution of Change in Scores')
+```
+```{r}
+pre_true1 <- 7-df[df$treated == 1,'True1_Pre_1']
+pre_true2 <- 7-df[df$treated == 1,'True2_Pre_1']
+```
+
+```{r}
+ggplot(data.frame(pre_true1), aes(x=pre_true1)) +
+  geom_bar(aes(y = (..count..)/sum(..count..))) +
+  ggtitle('Distribution of Pre-Test for True1 Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+```
+
+```{r}
+ggplot(data.frame(pre_true2), aes(x=pre_true2)) +
+  geom_bar(aes(y = (..count..)/sum(..count..))) +
+  ggtitle('Distribution of Pre-Test for True2 Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+```
+
+```{r}
+post_true1 <- 7-df[df$treated == 1,'True1_Post_1']
+post_true2 <- 7-df[df$treated == 1,'True2_Post_1']
+```
+
+```{r}
+ggplot(data.frame(post_true1), aes(x=post_true1)) +
+  geom_bar(aes(y = (..count..)/sum(..count..))) +
+  ggtitle('Distribution of Post-Test for True1 Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+```
+
+```{r}
+ggplot(data.frame(post_true2), aes(x=post_true2)) +
+  geom_bar(aes(y = (..count..)/sum(..count..))) +
+  ggtitle('Distribution of Post-Test for True2 Posts') +
+  xlab('Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(1, 6, by = 1))
+```
+
+
+```{r}
+delta_true1 <- -1 * df[df$treated == 1, 'True1_Delta_1']
+delta_true2 <- -1 * df[df$treated == 1, 'True2_Delta_1']
+```
+
+
+```{r}
+ggplot(data.frame(delta_true1), aes(x = delta_true1)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Distribution of Delta for True1 Posts') +
+  xlab('Change in Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(-5, 5, by = 1))
+```
+
+
+```{r}
+ggplot(data.frame(delta_true2), aes(x = delta_true2)) +
+  geom_bar(aes(y = (..count..) / sum(..count..))) +
+  ggtitle('Distribution of Delta for True2 Posts') +
+  xlab('Change in Score') +
+  ylab('% of Ratings') +
+  scale_x_continuous(breaks = seq(-5, 5, by = 1))
+```
+
+
+### Non-Linearity
+
+Although we see a relatively large effect of misidentifying non-manipulative posts, we also suspect that the 6 point scale of labeling for manipulativeness may not be linear. It is easier for participants to change from 2 to 3 than it is for them to change from 5 to 6 since it is easier to be less confident than to be very confident.
+
+To explore this change more formally, we try to binarize the scores to approximate participants' intentions when selecting different scores. We want to understand where would be a suitable cutoff where users really felt a change in manipulativeness.
+
+We use the pre-test distributions to explore where on the scale is the greatest relative change in the distribution of answers to the true and manipulative posts. We do this by looking at the difference between the share of answers falling above a potential binary split point for the true versus for the manipulative posts. We calculate these values for all possible binary split points and choose the one where the difference is the greatest. This is where the distributions are the most different in the pre true and manipulative answers. Our goal is to find the best binary split in terms of how people perceive the scale. This method is not ideal as it is still not a direct measure of this perception, however, it is the best we can do given our data.
+
+
+```{r}
+df %>%
+  dplyr::select(
+    'True1_Pre_1',
+    'True2_Pre_1',
+    'MisGraph1_Pre_1',
+    'Anecdotes1_Pre_1',
+    'FalseComp1_Pre_1',
+    'Combined1_Pre_1'
+  ) %>%
+  mutate(True1_Pre_1 = 7 - True1_Pre_1,
+         True2_Pre_1 = 7 - True2_Pre_1) %>%
+  pivot_longer(
+    c(
+      'True1_Pre_1',
+      'True2_Pre_1',
+      'MisGraph1_Pre_1',
+      'Anecdotes1_Pre_1',
+      'FalseComp1_Pre_1',
+      'Combined1_Pre_1'
+    ),
+    names_to = "question",
+    values_to = "value"
+  ) %>%
+  mutate(
+    is_true = question %in% c('True1_Pre_1',
+                              'True2_Pre_1'),
+    split_1 = value <= 1,
+    split_2 = value <= 2,
+    split_3 = value <= 3,
+    split_4 = value <= 4,
+    split_5 = value <= 5
+  ) %>%
+  # group_by(is_true) %>%
+  pivot_longer(
+    c('split_1',
+      'split_2',
+      'split_3',
+      'split_4',
+      'split_5'),
+    names_to = "split",
+    values_to = "split_value"
+  ) %>%
+  group_by(is_true, split) %>%
+  mutate(split_total = n()) %>%
+  ungroup() %>%
+  group_by(is_true, split, split_value) %>%
+  mutate(num_in_split = n(),
+         pct_in_split = num_in_split / split_total) %>%
+  ungroup() %>%
+  dplyr::select(is_true, split, split_value, pct_in_split) %>%
+  group_by(is_true, split) %>%
+  pivot_wider(names_from = split_value,
+              values_from = pct_in_split,
+              values_fn = mean) %>%
+  ungroup() %>%
+  mutate(pct_above = `FALSE`,
+         pct_diff = `TRUE` - `FALSE`) %>%
+  dplyr::select(is_true,
+         split,
+         pct_above) %>%
+  group_by(split) %>%
+  pivot_wider(names_from = is_true,
+              values_from = pct_above) %>%
+  rename(true_questions_above = `TRUE`,
+         false_questions_above = `FALSE`) %>%
+  mutate(abs_diff = abs(true_questions_above - false_questions_above))
+
+```
+
+We see that the optimal split is at a score of 2. Using this split does not change the direction of our insights. Skepticism of both manipulative and non-manipulative posts increased after our treatment.
+
+## Tactics
+
+The following figure plots the accuracy, precision, and recall of the participants' abilities to identify individual manipulative tactics in the test questions. 
+
+We evaluate each individual tactic across the 6 questions.
+
+Accuracy measures the number of times the user correctly identified the existence or lack of existence of a specific tactic.
+
+Precision measure the number of times the tactic is actually present in the question when the user says that the tactic is present.
+
+Recall measure the number of times the user identified the tactic when it was actually present in the question.
+
+These results are investigated in more detail by H2-H4 below.
+
+```{r}
+t.test(df_attention %>% 
+         filter(treated == 1) %>% 
+         pull(True1_Pre_2_accuracy)) %>% 
+  broom::tidy() %>% 
+  mutate(period = "pre",
+         treated = "1",
+         type = "True1-Graph") %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(True1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "True1-Graph"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(True2_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "True2"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(True2_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "True2"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(True1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "True1-Graph"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(True1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "True1-Graph"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(True2_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "True2"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(True2_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "True2"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Pre_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Post_2_accuracy)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "Anecdotes"
+    )
+  ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(Combined1_Pre_2_accuracy)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "1",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(Combined1_Pre_2_accuracy)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(Combined1_Post_2_accuracy)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(Combined1_Post_2_accuracy)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  mutate(period = factor(period, levels = c("pre", "post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(title = "Tactic Accuracy",
+       x = "pre- or post-treatment period",
+       y = "Tactic Accuracy") +
+  theme_classic() +
+  facet_wrap(. ~ type)
+
+```
+
+```{r}
+# t.test(df_attention %>% 
+#          filter(treated == 1) %>% 
+#          pull(True1_Pre_2_precision)) %>% 
+#   broom::tidy() %>% 
+#   mutate(period = "pre",
+#          treated = "1",
+#          type = "True1-Graph") %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True1_Pre_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "True1-Graph"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(True2_Pre_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "1",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True2_Pre_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(True1_Post_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "True1-Graph"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True1_Post_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "True1-Graph"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(True2_Post_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True2_Post_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  t.test(
+    df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Pre_2_precision)
+  ) %>% broom::tidy() %>% mutate(
+    period = "pre",
+    treated = "1",
+    type = "MisGraph1"
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Pre_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Post_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Post_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Pre_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Pre_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Post_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Post_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Pre_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Pre_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Post_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Post_2_precision)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "Anecdotes"
+    )
+  ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(Combined1_Pre_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "1",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(Combined1_Pre_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(Combined1_Post_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(Combined1_Post_2_precision)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  mutate(period = factor(period, levels = c("pre", "post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(title = "Tactic Precision",
+       x = "pre- or post-treatment period",
+       y = "Tactic Precision") +
+  theme_classic() +
+  facet_wrap(. ~ type)
+```
+
+```{r}
+# t.test(df_attention %>% 
+#          filter(treated == 1) %>% 
+#          pull(True1_Pre_2_recall)) %>% 
+#   broom::tidy() %>% 
+#   mutate(period = "pre",
+#          treated = "1",
+#          type = "True1-Graph") %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True1_Pre_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "True1-Graph"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(True2_Pre_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "1",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True2_Pre_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(True1_Post_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "True1-Graph"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True1_Post_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "True1-Graph"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(True2_Post_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(True2_Post_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "True2"
+  #   )
+  # ) %>%
+  # rbind(
+  t.test(
+    df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Pre_2_recall)
+  ) %>% broom::tidy() %>% mutate(
+    period = "pre",
+    treated = "1",
+    type = "MisGraph1"
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Pre_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Post_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Post_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "MisGraph1"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Pre_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Pre_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Post_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Post_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "FalseComp"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Pre_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "1",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Pre_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "pre",
+      treated = "0",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Post_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "1",
+      type = "Anecdotes"
+    )
+  ) %>%
+  rbind(
+    t.test(
+      df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Post_2_recall)
+    ) %>% broom::tidy() %>% mutate(
+      period = "post",
+      treated = "0",
+      type = "Anecdotes"
+    )
+  ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(Combined1_Pre_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "1",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(Combined1_Pre_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "pre",
+  #     treated = "0",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 1) %>% pull(Combined1_Post_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "1",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  # rbind(
+  #   t.test(
+  #     df_attention %>% filter(treated == 0) %>% pull(Combined1_Post_2_recall)
+  #   ) %>% broom::tidy() %>% mutate(
+  #     period = "post",
+  #     treated = "0",
+  #     type = "Combined"
+  #   )
+  # ) %>%
+  mutate(period = factor(period, levels = c("pre", "post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(title = "Tactic Recall",
+       x = "pre- or post-treatment period",
+       y = "Tactic Recall") +
+  theme_classic() +
+  facet_wrap(. ~ type)
+```
+
+### H2 - Misleading Graphs Tactic
+
+H2 is that: participants will be more capable of identifying misleading graphs after taking the course.
+
+<!-- As shown in the table below, our results indicate 0.12 points increase in accurately answering the question with misleading graphs. However, this finding is only significant before adjustments. -->
+
+```{r}
+# Binary version
+# t.test(
+#   df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2),
+#   df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2)
+# ) %>%
+#   broom::tidy() %>%
+#   mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+#   mutate_if(is.numeric, round, digits = 2) %>%
+#   select(-method,-alternative)
+```
+
+<!-- The results above are based on a binary outcome variable which measures whether participants pinpointed that the misleading element of each question was based on the graph. If the participant selected the correct misleading element, but also selected another tactic that wasn't present, they would be penalized for the whole question. -->
+
+<!-- Our other outcome measure focuses on each of the three tactics, one at a time. For each individual tactic, for each question participants get a 1 if it is correctly selected when the tactic present, or correctly not selected when tactic not present. Otherwise, they get a 0. Then, we take the average of the six zeroes or ones across all six questions for the given tactic. This percent is the accuracy of their ability to identify the given misleading tactic. (We use the same procedure for all three tactics). -->
+
+As shown below, we see that there is a slight decrease in accuracy of identifying the tactic, though not significant at a 5% level. 
+
+Accuracy is comprised of correctly identifying the tactic when it is present (recall) and making sure not to select the tactic when it is not present (precision). 
+
+We can see that the drop in accuracy is due to a drop in precision since treated users seem to select more tactics after going through the tactics course. This means our course was effective at introducing these tactics to the users and did make the users catch the tactic more often. However, the users did not fully understand the tactics and seemed to select those tactics even when they are not present.
+
+```{r}
+# Tactics Accuracy
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_accuracy)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+Precision drops for misleading graphs, but is not stat sig.
+
+```{r}
+# Tactics Precision
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_precision)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+Recall increases dramatically for misleading graphs is stat sig before and after multiple hypothesis corrections.
+
+```{r}
+# Tactics Recall
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_recall)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+
+### H3 - Anecdotes Tactic
+
+H3 is that: participants will be more capable of identifying anecdotes after taking the course.
+
+Across the questions, we see the same drop in accuracy of identifying the anecdote tactic correctly. However, this drop is not statistically significant.
+
+```{r}
+# Tactics Accuracy
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_accuracy)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+Precision drops slightly for anecdotes, but is not stat sig.
+
+```{r}
+# Tactics Precision
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_precision)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+Recall increases for anecdotes and is stat sig before multiple hypothesis corrections.
+
+```{r}
+# Tactics Recall
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_recall)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+
+<!-- As shown in the table below, participants' ability to answer the anecdote question correctly doesn't appear to improve with treatment. -->
+
+```{r}
+# Binary version
+# t.test(
+#   df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2),
+#   df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2)
+# ) %>%
+#   broom::tidy() %>%
+#   mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+#   mutate_if(is.numeric, round, digits = 2) %>%
+#   select(-method, -alternative)
+```
+
+### H4 - False Comparisons Tactic
+
+
+
+H4 is that: participants will be more capable of identifying false comparisons after taking the course.
+
+Across the questions, we see the same drop in accuracy of identifying the false comparison tactic correctly. This drop is statistically significant before multiple hypothesis correction, but not significant after correction.
+
+```{r}
+# Tactics Accuracy
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_accuracy),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_accuracy)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+Precision drops for false comparisons, but is not stat sig.
+
+```{r}
+# Tactics Precision
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_precision)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+Recall increases for false comparisons, but is not stat sig.
+
+```{r}
+# Tactics Recall
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_recall)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+<!-- As shown in the table below, participants' ability to answer the false comparison question correctly doesn't appear to improve with treatment. -->
+
+```{r}
+# Binary version
+# t.test(
+#   df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2),
+#   df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2)
+# ) %>%
+#   broom::tidy() %>%
+#   mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+#   mutate_if(is.numeric, round, digits = 2) %>%
+#   select(-method, -alternative)
+```
+
+## Sharing Actions
+
+### H5 - Sharing Online
+
+H5 is that: participants will be less likely to share misinformation online after taking the course.
+
+```{r}
+sharing_questions <- pre_post_individual %>%
+  mutate(
+    pre_true_3a = (True1_Pre_3a + True2_Pre_3a) / 2,
+    post_true_3a = (True1_Post_3a + True2_Post_3a) / 2,
+    pre_false_3a = (
+      MisGraph1_Pre_3a + FalseComp1_Pre_3a + Anecdotes1_Pre_3a + Combined1_Pre_3a
+    ) / 4,
+    post_false_3a = (
+      MisGraph1_Post_3a + FalseComp1_Post_3a + Anecdotes1_Post_3a + Combined1_Post_3a
+    ) / 4
+  ) %>%
+  mutate(
+    pre_true_3b = (True1_Pre_3b + True2_Pre_3b) / 2,
+    post_true_3b = (True1_Post_3b + True2_Post_3b) / 2,
+    pre_false_3b = (
+      MisGraph1_Pre_3b + FalseComp1_Pre_3b + Anecdotes1_Pre_3b + Combined1_Pre_3b
+    ) / 4,
+    post_false_3b = (
+      MisGraph1_Post_3b + FalseComp1_Post_3b + Anecdotes1_Post_3b + Combined1_Post_3b
+    ) / 4
+  ) 
+```
+
+```{r}
+sharing_questions %>%
+  dplyr::select(treated,
+         pre_true_3a,
+         post_true_3a,
+         pre_false_3a,
+         post_false_3a) %>%
+  filter(treated == 1) %>%
+  select_if(is.numeric) %>%
+  map_df( ~ broom::tidy(t.test(.)), .id = 'var') %>%
+  mutate(treated = "1") %>%
+  rbind(
+    sharing_questions %>%
+      dplyr::select(
+        treated,
+        pre_true_3a,
+        post_true_3a,
+        pre_false_3a,
+        post_false_3a
+      ) %>%
+      filter(treated == 0) %>%
+      select_if(is.numeric) %>%
+      map_df( ~ broom::tidy(t.test(.)), .id = 'var') %>%
+      mutate(treated = "0")
+  ) %>%
+  separate(var, into = c("period", "type")) %>%
+  mutate(period = factor(period, levels = c("pre", "post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(title = "Online Sharing Propensity",
+       x = "pre- or post-treatment period",
+       y = "1-6 likelihood to share post online") +
+  theme_classic() +
+  facet_wrap(. ~ type)
+```
+
+The results below suggest that participants’ propensity to share information online did not change significantly with treatment. This is not entirely unexpected since we did not explicitly steer our treated users towards sharing less through our course. That said, we had hoped that if participants get better at identifying misinformation, then they would share such content less. However, since this secondary effect on sharing would be smaller than the overall effect on identifying misinformation, it is possible that there is a small effect that we did not have enough power to detect.
+
+We may need to design specific lessons in the course to influence sharing directly (e.g. explaining that sharing misinformation could be harmful) to find larger, more easily detectable effect sizes. We also didn't explicitly test to see if some participants may share misinformation with the intention of debunking it. However, since sharing misinformation for any reason is harmful, as it increases its visibility and popularity, it is the overall sharing metric that is the most crucial one and we chose to focus on.
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_3a_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_3a_False)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+```{r, results='hide'}
+# Including both True and Misinfo posts
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_3a),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_3a)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+### H6 - Sharing Offline
+
+H6 is that: participants will be less likely to share misinformation offline after taking the course.
+
+```{r}
+sharing_questions %>%
+  dplyr::select(treated,
+         pre_true_3b,
+         post_true_3b,
+         pre_false_3b,
+         post_false_3b) %>%
+  filter(treated == 1) %>%
+  select_if(is.numeric) %>%
+  map_df( ~ broom::tidy(t.test(.)), .id = 'var') %>%
+  mutate(treated = "1") %>%
+  rbind(
+    sharing_questions %>%
+      dplyr::select(
+        treated,
+        pre_true_3b,
+        post_true_3b,
+        pre_false_3b,
+        post_false_3b
+      ) %>%
+      filter(treated == 0) %>%
+      select_if(is.numeric) %>%
+      map_df( ~ broom::tidy(t.test(.)), .id = 'var') %>%
+      mutate(treated = "0")
+  ) %>%
+  separate(var, into = c("period", "type")) %>%
+  mutate(period = factor(period, levels = c("pre", "post")),
+         treated = factor(treated, levels = c("1", "0"))) %>%
+  ggplot(aes(
+    period,
+    estimate,
+    ymin = conf.low,
+    ymax = conf.high,
+    color = treated
+  )) +
+  geom_pointrange(position = position_dodge(.1)) +
+  geom_line(aes(group = interaction(treated, type))) +
+  scale_color_grey() +
+  labs(title = "Offline Sharing Propensity",
+       x = "pre- or post-treatment period",
+       y = "1-6 likelihood to share post offline") +
+  theme_classic() +
+  facet_wrap(. ~ type)
+```
+
+As with H5, the results below suggest that participants’ propensity to share information offline did not change significantly with treatment. Again, this behavior may need to be something that treatment targets explicitly in order to influence it or a much larger sample size.
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_3b_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_3b_False)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+```{r, results='hide'}
+# Including both True and Misinfo posts
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_3b),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_3b)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+## Heterogeneous Treatment Effects (HTE)
+
+```{r}
+demographic_colnames <-
+  c(
+    'Gender',
+    'Race',
+    'Education',
+    'Income',
+    'Ideology',
+    'GeneralTrust',
+    'KnowFauci',
+    'TrustFauci',
+    'TrustScientists',
+    'NewsSources',
+    'PostFrequency',
+    'BlockUserSocialMedia',
+    'ReportUserSocialMedia',
+    'SeenManipulative',
+    'KnowSpot'
+  )
+```
+
+```{r}
+HTE_data <-
+  df_attention %>% mutate(Gender_numeric = case_when(Gender == 'Male' ~ 1,
+                                                 Gender == 'Female' ~ 2,
+                                                 TRUE ~ 3))
+HTE_data <-
+  HTE_data %>% mutate(White = ifelse(Race == 'White', 1, 0))
+
+group1_educ = c("Did not graduate from high school", "High school degree")
+group2_educ = c("Associate degree", "Bachelor's degree", "Some collage")
+HTE_data <- HTE_data %>%
+  mutate(
+    education_level_2 = case_when(
+      Education %in% group1_educ ~ 1,
+      Education %in% group2_educ ~ 2,
+      TRUE ~ 3
+    )
+  )
+
+HTE_data <-
+  HTE_data %>% mutate(GeneralTrust_numeric = as.numeric(GeneralTrust))
+
+HTE_data <-
+  HTE_data %>% mutate(FauciTrust_numeric = as.numeric(TrustFauci))
+
+HTE_data <-
+  HTE_data %>% mutate(SciTrust_numeric = as.numeric(TrustScientists))
+
+HTE_data <- HTE_data %>%
+  mutate(
+    PostFrequency_numeric = case_when(
+      PostFrequency == "Many times a day" ~ 5,
+      PostFrequency == "Daily" ~ 4,
+      PostFrequency == "Weekly" ~ 3,
+      PostFrequency == "Less than monthly" ~ 2,
+      PostFrequency == "Monthly" ~ 1,
+      PostFrequency == "I don't use social media" ~ 0
+    )
+  )
+
+HTE_data <- HTE_data %>% mutate(
+  BlockUserSocialMedia_numeric = case_when(
+    BlockUserSocialMedia == 'Yes' ~ 3,
+    BlockUserSocialMedia == 'No' ~ 2,
+    TRUE ~ 1
+  )
+)
+
+HTE_data <- HTE_data %>% mutate(
+  ReportUserSocialMedia_numeric = case_when(
+    ReportUserSocialMedia == 'Yes' ~ 3,
+    ReportUserSocialMedia == 'No' ~ 2,
+    TRUE ~ 1
+  )
+)
+```
+
+### H7 - Susceptibility to Misinformation
+
+H7 is that: participants with different levels of susceptibility to misinformation at baseline will react differently to the treatment in terms of their overall ability to identify manipulative content.
+
+We investigated this hypothesis using three measures of misinformation susceptibility from our survey:
+
+1. Participant performance on the pre-test (`pre_score`)
+2. Participants who self-identified as knowing how to spot manipulative techniques used in articles or headlines (`KnowSpot`)
+3. Participants who self-identified as having seen a manipulative news article or headline (`SeenManipulative`)
+
+The results of HTE analysis based on these three variables are shown below. None of the effects are significant. 
+
+The results based on `pre-score` may indicate that our test questions were sufficiently neutral to remove any effect. Nevertheless, some prior literature has found HTE based on misinformation susceptibility measured indirectly. Our results based on `KnowSpot` and `SeenManipulative` may indicate that participants struggle to self-identify their own susceptibility.  
+
+```{r}
+# pre_score
+HTE_data <- HTE_data %>% mutate(
+  pre_score = True1_Pre_1 + True2_Pre_1 + MisGraph1_Pre_1 + FalseComp1_Pre_1 + Anecdotes1_Pre_1 + Combined1_Pre_1
+)
+
+model_2 <- lm(mean_Delta_1_False ~ treated * pre_score, HTE_data)
+
+results_2 <- coeftest(model_2, vcov = vcovHC(model_2, type = "HC1"))
+results_2[4, ]
+```
+
+```{r}
+# KnowSpot
+HTE_data <- HTE_data %>%
+  mutate(KnowSpot_numeric = case_when(KnowSpot == "No" ~ 1, # 124
+                                      KnowSpot == "Not sure" ~ 2, # 196
+                                      KnowSpot == "Yes" ~ 3 # 321
+                                      ))
+                                      
+model_2 <-
+  lm(mean_Delta_1_False ~ treated * KnowSpot_numeric, HTE_data)
+
+results_2 <-
+  coeftest(model_2, vcov = vcovHC(model_2, type = "HC1"))
+results_2
+```
+
+```{r}
+# SeenManipulative
+HTE_data <- HTE_data %>%
+  mutate(
+    SeenManipulative_numeric = case_when(
+      SeenManipulative == "No" ~ 1,
+      # 77
+      SeenManipulative == "Not sure" ~ 2,
+      # 158
+      SeenManipulative == "Yes" ~ 3 # 406
+    )
+  )
+
+model_2 <-
+  lm(mean_Delta_1_False ~ treated * SeenManipulative_numeric,
+     HTE_data)
+
+results_2 <- coeftest(model_2, vcov = vcovHC(model_2, type = "HC1"))
+results_2
+```
+
+### H8 - Political Ideology
+
+H8 is that: participants with different political ideologies will react differently to the treatment in terms of their overall ability to identify manipulative content.
+
+We investigated this hypothesis using a question that asked participants to self-identify as one of "very liberal," "moderately liberal," "moderate," "moderately conservative,"  and "very conservative." The results, shown below, indicate that there were no significant HTE. This likely reflects the fact that we deliberately chose outcome questions to test misinformation that wouldn't be politically polarizing.
+
+```{r}
+HTE_data <- HTE_data %>%
+  mutate(
+    Ideology_numeric = case_when(
+      Ideology == "Very liberal" ~ -2,
+      Ideology == "Moderately liberal" ~ -1,
+      Ideology == "Moderate" ~ 0,
+      Ideology == "Moderately conservative" ~ 1,
+      Ideology == "Very conservative" ~ 2
+    )
+  )
+
+model_2 <-
+  lm(mean_Delta_1_False ~ treated * Ideology_numeric, HTE_data)
+
+results_2 <- coeftest(model_2, vcov = vcovHC(model_2, type = "HC1"))
+results_2[4, ]
+```
+
+### H9 - Income
+
+H9 is that: participants with different levels of income will react differently to the treatment in terms of their overall ability to identify manipulative content.
+
+We investigated this hypothesis using a question that asked participants to indicate which range best described their income: less than \$25,000, \$25,000-\$49,999, \$50,000-\$74,999, \$75,000-\$99,999, \$100,000-\$149,999, or \$150,000 or more. We combined these categories to measure participant income as: less than \$25,000, \$25,000-\$49,999, \$50,000-\$99,999, or \$100,000 or more. The results, shown below, indicate that there is a moderately significant HTE. In particular, they suggest that participants with higher incomes had smaller treatment effects. This result is in line with prior literature.
+
+```{r}
+HTE_data <- HTE_data %>%
+  mutate(
+    Income_numeric = case_when(
+      Income == "Less than $25,000" ~ 1,
+      # 172
+      Income == "$25,000 to $49,999" ~ 2,
+      # 192
+      Income == "$50,000 to $74,999" ~ 3,
+      # 198
+      Income == "$75,000 to $99,999" ~ 3,
+      # 198
+      Income == "$100,000 to $149,999" ~ 4,
+      # 78
+      Income == "$150,000 or more" ~ 4 # 78
+    )
+  )
+
+model_2 <-
+  lm(mean_Delta_1_False ~ treated * Income_numeric, HTE_data)
+
+results_2 <- coeftest(model_2, vcov = vcovHC(model_2, type = "HC1"))
+results_2
+```
+
+## Causal Trees
+
+Our analysis on the data  revealed some interesting findings that might be useful for future studies. Using multiple covariates to group people gives a better classification with very similar group members as compared to single covariate division. Therefore, we expect that groups made by causal trees will show stronger HTEs. The ML subgroups can also be used to inform new covariates or heterogenous policy assignments for future surveys. We also expect ML HTEs to reveal interesting correlations between covariates that can inform design decisions in the future.
+
+
+```{r}
+library(causalTree)
+library(grf)
+library(rpart)
+library(glmnet)
+library(splines)
+library(MASS)
+library(lmtest)
+library(sandwich)
+library(ggplot2)
+```
+
+```{r}
+n <- nrow(HTE_data)
+
+# Treatment: does the the gov't spend too much on "welfare" (1) or "assistance to the poor" (0)
+HTE_data = HTE_data %>% mutate(treatment = as.numeric(treated))
+treatment <- "treatment"
+
+# Outcome: 1 for 'yes', 0 for 'no'
+outcome <- "mean_Delta_1_False"
+
+covariates <-
+  c(
+    'Gender_numeric',
+    'White',
+    'education_level_2',
+    'Income_numeric',
+    'Ideology_numeric',
+    'GeneralTrust_numeric',
+    'FauciTrust_numeric',
+    'SciTrust_numeric',
+    'PostFrequency_numeric',
+    'BlockUserSocialMedia_numeric',
+    'ReportUserSocialMedia_numeric',
+    'SeenManipulative_numeric',
+    'KnowSpot_numeric'
+  )
+
+
+romano_wolf_correction <- function(t.orig, t.boot) {
+  abs.t.orig <- abs(t.orig)
+  abs.t.boot <- abs(t.boot)
+  abs.t.sorted <- sort(abs.t.orig, decreasing = TRUE)
+  
+  max.order <- order(abs.t.orig, decreasing = TRUE)
+  rev.order <- order(max.order)
+  
+  M <- nrow(t.boot)
+  S <- ncol(t.boot)
+  
+  p.adj <- rep(0, S)
+  p.adj[1] <- mean(apply(abs.t.boot, 1, max) > abs.t.sorted[1])
+  for (s in seq(2, S)) {
+    cur.index <- max.order[s:S]
+    p.init <-
+      mean(apply(abs.t.boot[, cur.index, drop = FALSE], 1, max) > abs.t.sorted[s])
+    p.adj[s] <- max(p.init, p.adj[s - 1])
+  }
+  p.adj[rev.order]
+}
+
+summary_rw_lm <-
+  function(model,
+           indices = NULL,
+           cov.type = "HC2",
+           num.boot = 10000) {
+    if (is.null(indices)) {
+      indices <- 1:nrow(coef(summary(model)))
+    }
+    # Grab the original t values.
+    summary <- coef(summary(model))[indices, , drop = FALSE]
+    t.orig <- summary[, "t value"]
+    
+    # Null resampling.
+    # This is a trick to speed up bootstrapping linear models.
+    # Here, we don't really need to re-fit linear regressions, which would be a bit slow.
+    # We know that betahat ~ N(beta, Sigma), and we have an estimate Sigmahat.
+    # So we can approximate "null t-values" by
+    #  - Draw beta.boot ~ N(0, Sigma-hat) --- note the 0 here, this is what makes it a *null* t-value.
+    #  - Compute t.boot = beta.boot / sqrt(diag(Sigma.hat))
+    Sigma.hat <- vcovHC(model, type = cov.type)[indices, indices]
+    se.orig <- sqrt(diag(Sigma.hat))
+    num.coef <- length(se.orig)
+    beta.boot <-
+      mvrnorm(n = num.boot,
+              mu = rep(0, num.coef),
+              Sigma = Sigma.hat)
+    t.boot <- sweep(beta.boot, 2, se.orig, "/")
+    p.adj <- romano_wolf_correction(t.orig, t.boot)
+    
+    result <- cbind(summary[, c(1, 2, 4), drop = F], p.adj)
+    colnames(result) <-
+      c('Estimate', 'Std. Error', 'Orig. p-value', 'Adj. p-value')
+    result
+  }
+```
+
+```{r}
+fmla <- paste(outcome, " ~", paste(covariates, collapse = " + "))
+
+# Dividing data into three subsets
+indices <-
+  split(seq(nrow(HTE_data)), sort(seq(nrow(HTE_data)) %% 3))
+names(indices) <- c('split', 'est', 'test')
+
+# Fitting the forest
+ct.unpruned <- honest.causalTree(
+  formula = fmla,
+  # Define the model
+  data = HTE_data[indices$split, ],
+  treatment = HTE_data[indices$split, treatment],
+  est_data = HTE_data[indices$est, ],
+  est_treatment = HTE_data[indices$est, treatment],
+  minsize = 1,
+  # Min. number of treatment and control cases in each leaf
+  HonestSampleSize = length(indices$est),
+  #  Num obs used in estimation after splitting
+  # We recommend not changing the parameters below
+  split.Rule = "CT",
+  # Define the splitting option
+  cv.option = "TOT",
+  # Cross validation options
+  cp = 0,
+  # Complexity parameter
+  split.Honest = TRUE,
+  # Use honesty when splitting
+  cv.Honest = TRUE              # Use honesty when performing cross-validation
+)
+```
+
+```{r}
+# Table of cross-validated values by tuning parameter.
+ct.cptable <- as.data.frame(ct.unpruned$cptable)
+
+# Obtain optimal complexity parameter to prune tree.
+cp.selected <- which.min(ct.cptable$xerror)
+cp.optimal <- ct.cptable[cp.selected, "CP"]
+
+# Prune the tree at optimal complexity parameter.
+ct.pruned <- ct.unpruned # prune(tree=ct.unpruned, cp=cp.optimal)
+
+# Predict point estimates (on estimation sample)
+tau.hat.est <- predict(ct.pruned, newdata = HTE_data[indices$est, ])
+
+# Create a factor column 'leaf' indicating leaf assignment in the estimation set
+num.leaves <- length(unique(tau.hat.est))
+leaf <-
+  factor(tau.hat.est,
+         levels = sort(unique(tau.hat.est)),
+         labels = seq(num.leaves))
+
+rpart.plot(
+  x = ct.pruned,
+  # Pruned tree
+  type = 3,
+  # Draw separate split labels for the left and right directions
+  fallen = TRUE,
+  # Position the leaf nodes at the bottom of the graph
+  leaf.round = 1,
+  # Rounding of the corners of the leaf node boxes
+  extra = 100,
+  # Display the percentage of observations in the node
+  branch = .1,
+  # Shape of the branch lines
+  box.palette = "RdBu"
+) # Palette for coloring the node
+```
+
+```{r}
+# This is only valid in randomized datasets.
+fmla <- paste0(outcome, ' ~ ', paste0(treatment, '* leaf'))
+if (num.leaves == 1) {
+  print("Skipping since there's a single leaf.")
+  
+} else if (num.leaves == 2) {
+  # if there are only two leaves, no need to correct for multiple hypotheses
+  ols <- lm(fmla, data = transform(HTE_data[indices$est, ], leaf = leaf))
+  coeftest(ols, vcov = vcovHC(ols, 'HC2'))[4, , drop = F]
+  
+} else {
+  # if there are three or more leaves, use Romano-Wolf test correction
+  ols <- lm(fmla, data = transform(HTE_data[indices$est, ], leaf = leaf))
+  interact <-
+    which(sapply(names(coef(ols)), function(x)
+      grepl(paste0(treatment, ":"), x)))
+  summary_rw_lm(ols, indices = interact, cov.type = 'HC')
+}
+```
+
+# Controlling Variance and Corrections
+
+## Reducing variance
+
+The main outcome (ability to identify misinformation) might have variability that can be explained by our covariates. To test for the possibility of variance reduction, we use the control group's change in score to identify manipulativeness as a measure of ability to identify misinformaiton and regress it against the covariates. A t-test on the coefficients captures the covariates that are significantly linked to the the ability to identify misinformation. We expect these covariates to also be linked to the final outcome that we test for in H1. 
+
+```{r}
+fmla <- paste('mean_Delta_1_False', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+We find that only trust in Fauci, and the self identified ability to spot misinformation is statistically significant in explaning pre-test score. In addition to these covariates, we also include ideology as a covariate given its importance in explanaing ability to identify misinformation in the literature.
+
+
+```{r}
+cov_to_check = c('Ideology_numeric', 'FauciTrust_numeric', 'KnowSpot_numeric')
+```
+
+```{r}
+model = lm(MisGraph1_Delta_2_accuracy ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+for (i in 1:length(cov_to_check)) {
+  covariate = cov_to_check[i]
+  
+  # Regress Ideology_numeric over treatment:
+  fmla = paste('MisGraph1_Delta_2_accuracy', '~ treatment +', covariate)
+  ols_balance <- lm(fmla, HTE_data)
+  # Calculate robust standard errors:
+  result = coeftest(ols_balance, vcov = vcovHC(ols_balance, type = "HC1"))
+  print(covariate)
+  print(result[1,])
+}
+```
+
+
+
+```{r}
+model = lm(FalseComp1_Delta_2_accuracy ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+for (i in 1:length(cov_to_check)) {
+  covariate = cov_to_check[i]
+  
+  # Regress Ideology_numeric over treatment:
+  fmla = paste('FalseComp1_Delta_2_accuracy', '~ treatment +', covariate)
+  ols_balance <- lm(fmla, HTE_data)
+  # Calculate robust standard errors:
+  result = coeftest(ols_balance, vcov = vcovHC(ols_balance, type = "HC1"))
+  print(covariate)
+  print(result[1,])
+
+}
+
+```
+
+
+
+```{r}
+model = lm(Anecdotes1_Delta_2_accuracy ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+for (i in 1:length(cov_to_check)) {
+  covariate = cov_to_check[i]
+  
+  # Regress Ideology_numeric over treatment:
+  fmla = paste('Anecdotes1_Delta_2_accuracy', '~ treatment +', covariate)
+  ols_balance <- lm(fmla, HTE_data)
+  # Calculate robust standard errors:
+  result = coeftest(ols_balance, vcov = vcovHC(ols_balance, type = "HC1"))
+  print(covariate)
+  print(result[1,])
+
+}
+
+```
+
+
+We find that for all of the individual tactic outcomes that we considered, correcting for ideology significantly reduced the standard error for the outcome whereas including trust in Fauci and self-described ability to identify misinformation increased the standard error by a notable amount. We see a reduction by close to 20\% for all the individual level tactic questions with ideology correction. 
+
+
+Next, we tried the same approach for the sharing questions
+
+```{r}
+fmla <- paste('mean_Delta_3a_False', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+cov_to_check = c('Ideology_numeric', 'FauciTrust_numeric', 'KnowSpot_numeric', 'PostFrequency_numeric', 'BlockUserSocialMedia_numeric', 'SeenManipulative_numeric')
+```
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+for (i in 1:length(cov_to_check)) {
+  covariate = cov_to_check[i]
+  
+  # Regress Ideology_numeric over treatment:
+  fmla = paste('mean_Delta_3a_False', '~ treatment +', covariate)
+  ols_balance <- lm(fmla, HTE_data)
+  # Calculate robust standard errors:
+  result = coeftest(ols_balance, vcov = vcovHC(ols_balance, type = "HC1"))
+  print(covariate)
+  print(result[1,])
+}
+```
+
+```{r}
+fmla <- paste('mean_Delta_3b_False', " ~", paste(covariates, collapse = " + "))
+
+model = lm(fmla, data_control)
+coeftest(model, vcov = vcovHC(model, type="HC1"))
+```
+
+
+```{r}
+cov_to_check = c('Ideology_numeric', 'GeneralTrust_numeric')
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+for (i in 1:length(cov_to_check)) {
+  covariate = cov_to_check[i]
+  
+  # Regress Ideology_numeric over treatment:
+  fmla = paste('mean_Delta_3b_False', '~ treatment +', covariate)
+  ols_balance <- lm(fmla, HTE_data)
+  # Calculate robust standard errors:
+  result = coeftest(ols_balance, vcov = vcovHC(ols_balance, type = "HC1"))
+  print(covariate)
+  print(result[1,])
+}
+```
+
+We find that for both the sharing outcomes, correcting for ideology significantly reduced the standard error for the outcome whereas the other increased the standard error by a notable amount. Correcting for ideology made the estimates more negative though, which is why we did not include the correction finally. 
+
+## Covariate Balance
+
+We check whether different covariates that we later use for HTE analysis are balanced between treatment and control groups and correct for any imbalances.
+
+```{r}
+covariates <-
+  c(
+    'Gender_numeric',
+    'White',
+    'education_level_2',
+    'Income_numeric',
+    'Ideology_numeric',
+    'GeneralTrust_numeric',
+    'FauciTrust_numeric',
+    'SciTrust_numeric',
+    'PostFrequency_numeric',
+    'BlockUserSocialMedia_numeric',
+    'ReportUserSocialMedia_numeric',
+    'SeenManipulative_numeric',
+    'KnowSpot_numeric'
+  )
+
+p_vals = rep(0, length(covariates))
+
+for (i in 1:length(covariates)) {
+  covariate = covariates[i]
+  
+  # Regress Ideology_numeric over treatment:
+  fmla = paste(covariate, '~', treatment)
+  ols_balance <- lm(fmla, HTE_data)
+  # Calculate robust standard errors:
+  result = coeftest(ols_balance, vcov = vcovHC(ols_balance, type = "HC1"))
+  
+  p_vals[i] = result[2, 4]
+}
+
+p_vals = p.adjust(p_vals, method = 'BH')
+cov_not_balanced = covariates[which(p_vals <= 0.05)]
+cov_not_balanced
+```
+
+We find that 'Race', 'Block Users Social Media', and 'Report Users Social Media' are not balanced between treatment and control. Since the blocking and reporting covariate are highly correlated, we decided to only correct for 'Block Users Social Media' and 'Race' in our new calculations.
+
+### Correcting Covariate Imbalance
+
+Regression adjustment for these covariates did not improve the performance by a lot, and we stick with the covariate adjustments described in the previous section.
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated + pre_score, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated + pre_score, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(MisGraph1_Delta_2_accuracy ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(
+  MisGraph1_Delta_2_accuracy ~ treated + BlockUserSocialMedia_numeric + White,
+  HTE_data
+)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(Anecdotes1_Delta_2_accuracy ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(
+  Anecdotes1_Delta_2_accuracy ~ treated + BlockUserSocialMedia_numeric + White,
+  HTE_data
+)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(FalseComp1_Delta_2_accuracy ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(
+  FalseComp1_Delta_2_accuracy ~ treated + BlockUserSocialMedia_numeric + White,
+  HTE_data
+)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated + BlockUserSocialMedia_numeric + White,
+           HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated, HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated + BlockUserSocialMedia_numeric + White,
+           HTE_data)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+## Correcting for Randomization of Question Order
+
+To control for any variation in the difficulty of the exact matched pre and post test questions we show participants, we randomized which question each person sees in the pre and in the post question, from each of the six pairs of questions. 
+
+We also corrected for this randomization and showed minor improvements in the estimates for nearly all outcomes.
+
+```{r}
+model = lm(MisGraph1_Delta_2_accuracy ~ treated, df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(MisGraph1_Delta_2_accuracy ~ treated + as.factor(neg_misgraph1),
+           df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(Anecdotes1_Delta_2_accuracy ~ treated , df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(Anecdotes1_Delta_2_accuracy ~ treated + as.factor(neg_anecdotes1),
+           df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(Anecdotes1_Delta_2_accuracy ~ treated, df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(Anecdotes1_Delta_2_accuracy ~ treated + as.factor(neg_falsecomp1),
+           df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated , df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3a_False ~ treated + as.factor(neg_misgraph1),
+           df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated , df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+```{r}
+model = lm(mean_Delta_3b_False ~ treated + as.factor(neg_misgraph1),
+           df_attention)
+results <- coeftest(model, vcov = vcovHC(model, type = "HC1"))
+results
+```
+
+
+<!-- ### Multiple hypothesis correction -->
+
+<!-- Since the hypotheses in our experiment are dependent on each other, a Bonferroni or Holm correction would be too strict. Benjamini-Hochberg correction is a better alternative, but it controls for False Discovery Rate (FDR) rather than Family Wise Error Rate (FWER) which is more substantive. We decided to use a bootstrap correction, by simulating our experiment from the pilot data with testing for what fraction of times we detected a false discovery. The code for bootstrap is given below. We found a corrected alpha of 0.007 from our bootstrap simulation. This alpha performs FWER at a significance level greater than that of Bonferonni correction (0.05/9), which makes sense as the outcomes are dependent on each other. As the graphs show, we still have sufficient power. This also agrees with our estimate from the pilot. -->
+
+<!-- ```{r} -->
+<!-- N <- dim(df_attention)[1] -->
+
+<!-- count = 1 -->
+
+<!-- data_control = HTE_data %>% filter(treatment == 0) -->
+<!-- data_treated = HTE_data %>% filter(treatment == 1) -->
+<!-- no_control = dim(data_control)[1] -->
+<!-- no_treated = dim(data_treated)[1] -->
+
+<!-- trial <- function() {  # trial() simulates experiment by sampling from pilot -->
+
+<!--   outcome1_control = sample(data_control$mean_Delta_1_False, no_control, replace = TRUE) # avg overall score -->
+<!--   outcome1_treatment = sample(data_control$mean_Delta_1_False, no_treated, replace = TRUE) -->
+
+<!--   outcome2_control = sample(data_control$MisGraph1_Delta_2_proportion, no_control, replace = TRUE) # graph Q -->
+<!--   outcome2_treatment = sample(data_control$MisGraph1_Delta_2_proportion, no_treated, replace = TRUE)  -->
+
+<!--   outcome3_control = sample(data_control$Anecdotes1_Delta_2_proportion, no_control, replace = TRUE)  # anecdote Q -->
+<!--   outcome3_treatment = sample(data_control$Anecdotes1_Delta_2_proportion, no_treated, replace = TRUE) -->
+
+<!--   outcome4_control = sample(data_control$FalseComp1_Delta_2_proportion, no_control, replace = TRUE) # false comparison Q -->
+<!--   outcome4_treatment = sample(data_control$FalseComp1_Delta_2_proportion, no_treated, replace = TRUE) -->
+
+<!--   outcome5_control = sample(data_control$mean_Delta_3a_False, no_control, replace = TRUE) # behaviour 1 Q -->
+<!--   outcome5_treatment = sample(data_control$mean_Delta_3a_False, no_treated, replace = TRUE) -->
+
+<!--   outcome6_control = sample(data_control$mean_Delta_3b_False, no_control, replace = TRUE) # behaviour 2 Q -->
+<!--   outcome6_treatment = sample(data_control$mean_Delta_3b_False, no_treated, replace = TRUE) -->
+
+<!--   outcome7_control = sample(data_control$mean_Delta_3a_False * data_control$pre_score, no_control, replace = TRUE) # HTE 1 -->
+<!--   outcome7_treatment = sample(data_control$mean_Delta_3a_False * data_control$pre_score, no_treated, replace = TRUE) -->
+
+<!--   outcome8_control = sample(data_control$mean_Delta_3a_False * data_control$Ideology_numeric, no_control, replace = TRUE) # HTE 2 -->
+<!--   outcome8_treatment = sample(data_control$mean_Delta_3a_False * data_control$Ideology_numeric, no_treated, replace = TRUE) -->
+
+<!--   outcome9_control = sample(data_control$mean_Delta_3a_False * data_control$Income_numeric, no_control, replace = TRUE) # HTE 3 -->
+<!--   outcome9_treatment = sample(data_control$mean_Delta_3a_False * data_control$Income_numeric, no_control, replace = TRUE) -->
+
+
+<!--   p_val_1 = t.test(outcome1_control, outcome1_treatment)$p.value -->
+<!--   p_val_2 = t.test(outcome2_control, outcome2_treatment)$p.value -->
+<!--   p_val_3 = t.test(outcome3_control, outcome3_treatment)$p.value -->
+<!--   p_val_4 = t.test(outcome4_control, outcome4_treatment)$p.value -->
+<!--   p_val_5 = t.test(outcome5_control, outcome5_treatment)$p.value -->
+<!--   p_val_6 = t.test(outcome6_control, outcome6_treatment)$p.value -->
+<!--   p_val_7 = t.test(outcome7_control, outcome7_treatment)$p.value -->
+<!--   p_val_8 = t.test(outcome8_control, outcome8_treatment)$p.value -->
+<!--   p_val_9 = t.test(outcome9_control, outcome9_treatment)$p.value -->
+
+<!--   p_values = c(p_val_1, p_val_2, p_val_3, p_val_4, p_val_5, p_val_6, p_val_7, p_val_8, p_val_9 ) -->
+<!--   return(p_values) -->
+<!-- } -->
+<!-- ``` -->
+
+
+<!-- ```{r, cache = TRUE} -->
+<!-- set.seed(103851) -->
+<!-- wrapper_replicate <- function(alpha){ -->
+<!--   #print(count) -->
+<!--   count = count + 1 -->
+<!--   outcome = replicate(1000, trial()) # replicate experiment -->
+
+<!--     return(mean(apply(outcome, 2, function(x) min(x) <= alpha))) # amake any false discovery -->
+<!-- } -->
+
+<!-- alpha_range <- seq(0.005, 0.01, length.out = 50) # trying to find the right alpha among these -->
+
+<!-- frac_wrong2 <- sapply(alpha_range, wrapper_replicate) # false discoveries with different values of alpha -->
+
+<!-- alpha_range[max(which(frac_wrong2 < 0.05))] # find the alpha at which fraction of false discoveries < 0.05 -->
+<!-- ``` -->
+
+# Robustness Checks
+
+## Attention Check for Robustness
+
+Using “pass at least 1 attention check” increases our sample size from 641 to 838, which is 84.3% of our total participants. With this larger set, our effect sizes are reduced a little, but not enough to change any of our insights. Since we care about the quality of our answers, we used our “pass both attention check” criteria for our analysis.
+
+```{r}
+df_attention <-  df %>%
+  filter(attention_miss < 2)
+```
+
+H1 - Identifying Manipulativeness
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1_False)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+SH1 - Misidentifying True
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_1_True),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_1_True)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+H2 - Misleading Graphs Tactic
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_precision)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(MisGraph1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(MisGraph1_Delta_2_recall)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method,-alternative)
+```
+
+H3 - Anecdotes Tactic
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_precision)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Anecdotes1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(Anecdotes1_Delta_2_recall)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+H4 - False Comparisons Tactic
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_precision),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_precision)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(FalseComp1_Delta_2_recall),
+  df_attention %>% filter(treated == 0) %>% pull(FalseComp1_Delta_2_recall)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+H5 - Sharing Online
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_3a_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_3a_False)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+H6 - Sharing Offline
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(mean_Delta_3b_False),
+  df_attention %>% filter(treated == 0) %>% pull(mean_Delta_3b_False)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+Reset attention back to stricter criteria.
+
+```{r}
+df_attention <-  df %>%
+  filter(attention_miss == 0)
+```
+
+## Power Confirmation
+
+With the actual data, we can calculate the power of every question.
+
+```{r}
+df_summarized <- df %>%
+  filter(attention_miss == 0) %>%
+  group_by(treated) %>%
+  summarize(
+    n = n(),
+    Delta_1_False_mean = mean(mean_Delta_1_False),
+    Delta_1_False_sd = sd(mean_Delta_1_False),
+    Delta_1_True_mean = mean(mean_Delta_1_True),
+    Delta_1_True_sd = sd(mean_Delta_1_True),
+    Delta_2_mean = mean(tactics_Delta),
+    Delta_2_sd = sd(tactics_Delta),
+    Delta_3a_False_mean = mean(mean_Delta_3a_False),
+    Delta_3a_False_sd = sd(mean_Delta_3a_False),
+    Delta_3b_False_mean = mean(mean_Delta_3b_False),
+    Delta_3b_False_sd = sd(mean_Delta_3b_False)
+  )
+
+calculate_power <- function(n_treatment,
+                            n_control,
+                            split,
+                            treatment_mean,
+                            treatment_sd,
+                            control_mean,
+                            control_sd) {
+  treatment_group <- rnorm(n_treatment, treatment_mean, treatment_sd)
+  control_group <- rnorm(n_control, control_mean, control_sd)
+  
+  t.test(treatment_group, control_group) %>% broom::tidy()
+}
+
+power_sims <- function(n_treatment,
+                       n_control,
+                       split,
+                       treatment_mean,
+                       treatment_sd,
+                       control_mean,
+                       control_sd,
+                       p_adjustments) {
+  power_results <- tibble()
+  for (i in 1:1000) {
+    power_results <- power_results %>%
+      rbind(
+        calculate_power(
+          n_treatment,
+          n_control,
+          split,
+          treatment_mean,
+          treatment_sd,
+          control_mean,
+          control_sd
+        ) %>% mutate(i = i)
+      )
+  }
+  
+  power_results %>%
+    mutate(row_n = row_number()) %>%
+    group_by(row_n) %>%
+    mutate(p_value_adjusted = p.adjust(p.value, method = "BH", n = p_adjustments)) %>%
+    mutate(significant = if_else(p_value_adjusted < .05, 1, 0)) %>%
+    ungroup() %>%
+    summarize(power = sum(significant) / 1000) %>%
+    mutate(
+      n_treatment = n_treatment,
+      n_control = n_control,
+      treatment_mean = treatment_mean,
+      treatment_sd = treatment_sd,
+      control_mean = control_mean,
+      control_sd = control_sd,
+      p_adjustments
+    )
+}
+```
+
+Our power calculations are based on the summary statistics above. In particular, our power calculations use the standard deviations to calculate post-hoc power with 10 $p$-value adjustments.
+
+Overall, our pre-experiment power calculations were good, but our estimates were just okay. We observe a 6.5% improvement in the main detection task. This is good. However, we knew that this a 6.5% treatment improvement would result in just having marginally enough power (and we see that play out above). Implementing Romano Wolff may possibly help in this regard. 
+
+Importantly, we didn’t observe any real difference in the standard deviations between the control and treatment groups for the main task. This was unfortunate: we made this assumption and used imbalanced control and treatment group sizes in the hope of increasing our power. Doing a post-hoc power calculation, our power would have marginally improved if we allocated participants to control and treatment equally.
+
+```{r, results='hide'}
+# Delta_1_False
+n_treatment <- 214
+n_control <- 427
+treatment_mean <- 0.7394614	
+treatment_sd <- 1.160356	
+control_mean <- 0.1133178	
+control_sd = 1.132510
+p_adjustments <- 10
+
+power_sims(
+  n_treatment,
+  n_control,
+  split,
+  treatment_mean,
+  treatment_sd,
+  control_mean,
+  control_sd,
+  p_adjustments
+)
+```
+
+```{r, results='hide'}
+# Delta_1_True
+n_treatment <- 214
+n_control <- 427
+treatment_mean <- -0.6147541
+treatment_sd <- 1.842621	
+control_mean <- 0.1588785	
+control_sd = 1.676401
+p_adjustments <- 10
+
+power_sims(
+  n_treatment,
+  n_control,
+  split,
+  treatment_mean,
+  treatment_sd,
+  control_mean,
+  control_sd,
+  p_adjustments
+)
+```
+
+
+```{r, results='hide'}
+# Delta_2
+n_treatment <- 214
+n_control <- 427
+treatment_mean <- -0.10538642
+treatment_sd <- 1.389310
+control_mean <- 0.08878505
+control_sd = 1.306023
+p_adjustments <- 10
+
+power_sims(
+  n_treatment,
+  n_control,
+  split,
+  treatment_mean,
+  treatment_sd,
+  control_mean,
+  control_sd,
+  p_adjustments
+)
+```
+
+```{r, results='hide'}
+# Delta_3a
+n_treatment <- 214
+n_control <- 427
+treatment_mean <- -0.207260
+treatment_sd <- 0.9550121
+control_mean <- -0.161215	
+control_sd = 0.7929800
+p_adjustments <- 10
+
+power_sims(
+  n_treatment,
+  n_control,
+  split,
+  treatment_mean,
+  treatment_sd,
+  control_mean,
+  control_sd,
+  p_adjustments
+)
+```
+
+```{r, results='hide'}
+# Delta_3b
+n_treatment <- 214
+n_control <- 427
+treatment_mean <- -0.3079625	
+treatment_sd <- 1.0083314
+control_mean <- -0.2242991
+control_sd = 0.9366273
+p_adjustments <- 10
+
+power_sims(
+  n_treatment,
+  n_control,
+  split,
+  treatment_mean,
+  treatment_sd,
+  control_mean,
+  control_sd,
+  p_adjustments
+)
+```
+
+```{r}
+# Overall power summary
+df_summarized %>%
+  mutate(
+    Delta_1_False_power = 0.999,
+    Delta_1_True_power = 0.992,
+    Delta_2_power = 0.097,
+    Delta_3a_power = 0.012,
+    Delta_3b_power = 0.036
+  ) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(
+    treated,
+    n,
+    Delta_1_False_power,
+    Delta_1_True_power,
+    Delta_2_power,
+    Delta_3a_power,
+    Delta_3b_power
+  )
+```
+
+# Additional Insights
+
+### Time Spent
+
+To better understand how participants interacted with the survey, we analyzed the time they spent engaging with different components. First, we tested whether the control and treatment groups spent a different amount of time completing their respective courses. The difference is significant, but only before adjustments. 
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Treatment_Timer_Total),
+  df_attention %>% filter(treated == 0) %>% pull(Control_Timer_Total)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+Next, we tested whether the time survey participants spent on the test pre-treatment, was different to the test post-treatment. Note that, for this test, we included all participants regardless of whether they were in the treatment or control arm. The results suggest that the difference is significant, both before and after treatment. In particular, participants spent, on average, less time post-treatment than they did pre-treatment.
+
+```{r}
+t.test(df_attention %>% pull(Post_Timer_Total),
+       df_attention %>% pull(Pre_Timer_Total)) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+Next, we tested whether this same difference between the pre and post-tests was present if we only consider treated participants. The results suggest that the difference is significant, both before and after adjustments.
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Post_Timer_Total),
+  df_attention %>% filter(treated == 1) %>% pull(Pre_Timer_Total)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+Finally, we tested if the different time participants spent on the pre and post-tests differed based on their allocation to the control and treatment arms. The results suggest that the difference wasn't significant, even before adjustments.
+
+```{r}
+t.test(
+  df_attention %>% filter(treated == 1) %>% pull(Delta_Timer_Total),
+  df_attention %>% filter(treated == 0) %>% pull(Delta_Timer_Total)
+) %>%
+  broom::tidy() %>%
+  mutate(p.value_adjusted = p.adjust(p.value, method = "BH", n = 10)) %>%
+  mutate_if(is.numeric, round, digits = 2) %>%
+  dplyr::select(-method, -alternative)
+```
+
+### Pre-Treatment Correlations
+
+```{r}
+data_covariates <-
+  dplyr::select(
+    HTE_data,
+    c(
+      'mean_Delta_1_False',
+      'MisGraph1_Delta_2_accuracy',
+      'Anecdotes1_Delta_2_accuracy',
+      'FalseComp1_Delta_2_accuracy',
+      'mean_Delta_3a',
+      'mean_Delta_3b',
+      'pre_score',
+      'Gender_numeric',
+      'White',
+      'education_level_2',
+      'Income_numeric',
+      'Ideology_numeric',
+      'GeneralTrust_numeric',
+      'FauciTrust_numeric',
+      'SciTrust_numeric',
+      'PostFrequency_numeric',
+      'BlockUserSocialMedia_numeric',
+      'ReportUserSocialMedia_numeric',
+      'SeenManipulative_numeric',
+      'KnowSpot_numeric'
+    )
+  )
+
+library(ggcorrplot)
+
+ggcorrplot(cor(data_covariates))
+```
+
+We see that only pre-score (i.e. baseline susceptibility score calculated from pre-test survey responses) is correlated with the main outcomes of the experiment. This makes sense as the main outcomes are calculated as post-score - pre-score, i.e. we have already adjusted for pre-score in our design of the experiment. It is interesting to note that pre-score is also correlated with the sharing behavior measured by mean_Delta_3a and mean_Delta_3b. Correcting for the pre-score covariate did not change the estimates for sharing outcomes by a lot.
+
+
+
+
+# Future Experiments
+
+Our experiment could only yield limited insights due to budget and time constraints. However, these insights prompt additional questions and provide directions for future research.
+
+In particular, we suggest 3 directions of additional research on this topic.
+
+1. Longer term effects of treatment (and in general longer time for delivering treatment messages)
+2. Behavior focused treatments, focusing on explaining the importance of not sharing misinformation
+3. Measuring misinformation identification with evidence search or with observations on real world behavior
+
